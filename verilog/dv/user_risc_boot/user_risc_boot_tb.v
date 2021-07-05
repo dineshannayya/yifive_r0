@@ -69,12 +69,12 @@
 ////                                                              ////
 //////////////////////////////////////////////////////////////////////
 
-`default_nettype none
+`default_nettype wire
 
 `timescale 1 ns / 1 ns
 
+`include "s25fl256s.sv"
 `include "uprj_netlists.v"
-`include "spiflash.v"
 `include "mt48lc8m8a2.v"
 
 module user_risc_boot_tb;
@@ -126,7 +126,7 @@ module user_risc_boot_tb;
 	`ifdef WFDUMP
 	   initial begin
 	   	$dumpfile("risc_boot.vcd");
-	   	$dumpvars(0, user_risc_boot_tb);
+	   	$dumpvars(2, user_risc_boot_tb);
 	   end
        `endif
 
@@ -259,10 +259,15 @@ user_project_wrapper u_top(
 
    wire flash_clk = io_out[30];
    wire flash_csb = io_out[31];
-   tri  flash_io0 = (io_oeb[32]== 1'b0) ? io_out[32] : 1'bz;
-   tri  flash_io1 = (io_oeb[33]== 1'b0) ? io_out[33] : 1'bz;
-   tri  flash_io2 = (io_oeb[34]== 1'b0) ? io_out[34] : 1'bz;
-   tri  flash_io3 = (io_oeb[35]== 1'b0) ? io_out[35] : 1'bz;
+   // Creating Pad Delay
+   wire #1 io_oeb_32 = io_oeb[32];
+   wire #1 io_oeb_33 = io_oeb[33];
+   wire #1 io_oeb_34 = io_oeb[34];
+   wire #1 io_oeb_35 = io_oeb[35];
+   tri  flash_io0 = (io_oeb_32== 1'b0) ? io_out[32] : 1'bz;
+   tri  flash_io1 = (io_oeb_33== 1'b0) ? io_out[33] : 1'bz;
+   tri  flash_io2 = (io_oeb_34== 1'b0) ? io_out[34] : 1'bz;
+   tri  flash_io3 = (io_oeb_35== 1'b0) ? io_out[35] : 1'bz;
 
    assign io_in[32] = flash_io0;
    assign io_in[33] = flash_io1;
@@ -271,16 +276,21 @@ user_project_wrapper u_top(
 
 
    // Quard flash
-	spiflash #(
-		.FILENAME("user_risc_boot.hex")
-	) u_user_spiflash (
-		.csb(flash_csb),
-		.clk(flash_clk),
-		.io0(flash_io0),
-		.io1(flash_io1),
-		.io2(flash_io2),
-		.io3(flash_io3)	
-	);
+     s25fl256s #(.mem_file_name("user_risc_boot.hex"),
+	         .otp_file_name("none")) 
+		 u_spi_flash_256mb (
+           // Data Inputs/Outputs
+       .SI      (flash_io0),
+       .SO      (flash_io1),
+       // Controls
+       .SCK     (flash_clk),
+       .CSNeg   (flash_csb),
+       .WPNeg   (flash_io2),
+       .HOLDNeg (flash_io3),
+       .RSTNeg  (!wb_rst_i)
+
+       );
+
 
 
 //------------------------------------------------
@@ -383,9 +393,35 @@ begin
 end
 endtask
 
+`ifdef GL
 
+wire        wbd_spi_stb_i   = u_top.u_spi_master.wbd_stb_i;
+wire        wbd_spi_ack_o   = u_top.u_spi_master.wbd_ack_o;
+wire        wbd_spi_we_i    = u_top.u_spi_master.wbd_we_i;
+wire [31:0] wbd_spi_adr_i   = u_top.u_spi_master.wbd_adr_i;
+wire [31:0] wbd_spi_dat_i   = u_top.u_spi_master.wbd_dat_i;
+wire [31:0] wbd_spi_dat_o   = u_top.u_spi_master.wbd_dat_o;
+wire [3:0]  wbd_spi_sel_i   = u_top.u_spi_master.wbd_sel_i;
 
+wire        wbd_sdram_stb_i = u_top.u_sdram_ctrl.wb_stb_i;
+wire        wbd_sdram_ack_o = u_top.u_sdram_ctrl.wb_ack_o;
+wire        wbd_sdram_we_i  = u_top.u_sdram_ctrl.wb_we_i;
+wire [31:0] wbd_sdram_adr_i = u_top.u_sdram_ctrl.wb_addr_i;
+wire [31:0] wbd_sdram_dat_i = u_top.u_sdram_ctrl.wb_dat_i;
+wire [31:0] wbd_sdram_dat_o = u_top.u_sdram_ctrl.wb_dat_o;
+wire [3:0]  wbd_sdram_sel_i = u_top.u_sdram_ctrl.wb_sel_i;
 
+wire        wbd_uart_stb_i  = u_top.u_uart_core.reg_cs;
+wire        wbd_uart_ack_o  = u_top.u_uart_core.reg_ack;
+wire        wbd_uart_we_i   = u_top.u_uart_core.reg_wr;
+wire [7:0]  wbd_uart_adr_i  = u_top.u_uart_core.reg_addr;
+wire [7:0]  wbd_uart_dat_i  = u_top.u_uart_core.reg_wdata;
+wire [7:0]  wbd_uart_dat_o  = u_top.u_uart_core.reg_rdata;
+wire        wbd_uart_sel_i  = u_top.u_uart_core.reg_be;
+
+`endif
+
+/**
 `ifdef GL
 //-----------------------------------------------------------------------------
 // RISC IMEM amd DMEM Monitoring TASK
@@ -403,5 +439,6 @@ always@(posedge `RISC_CORE.wb_clk) begin
 end
 
 `endif
+**/
 endmodule
 `default_nettype wire
