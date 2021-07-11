@@ -7,12 +7,6 @@ module user_project_wrapper (user_clock2,
     wbs_we_i,
     vccd1,
     vssd1,
-    vccd2,
-    vssd2,
-    vdda1,
-    vssa1,
-    vdda2,
-    vssa2,
     analog_io,
     io_in,
     io_oeb,
@@ -34,12 +28,6 @@ module user_project_wrapper (user_clock2,
  input wbs_we_i;
  input vccd1;
  input vssd1;
- input vccd2;
- input vssd2;
- input vdda1;
- input vssa1;
- input vdda2;
- input vssa2;
  inout [28:0] analog_io;
  input [37:0] io_in;
  output [37:0] io_oeb;
@@ -53,28 +41,12 @@ module user_project_wrapper (user_clock2,
  output [31:0] wbs_dat_o;
  input [3:0] wbs_sel_i;
 
- clk_buf u_buf1_wb_rstn (.clk_i(wbd_int_rst_n),
-    .clk_o(wbd_int1_rst_n),
-    .vccd1(vccd1),
-    .vssd1(vssd1));
- clk_buf u_buf1_wbclk (.clk_i(wbd_clk_int),
-    .clk_o(wbd_clk_int1),
-    .vccd1(vccd1),
-    .vssd1(vssd1));
- clk_buf u_buf2_wb_rstn (.clk_i(wbd_int1_rst_n),
-    .clk_o(wbd_int2_rst_n),
-    .vccd1(vccd1),
-    .vssd1(vssd1));
- clk_buf u_buf2_wbclk (.clk_i(wbd_clk_int1),
-    .clk_o(wbd_clk_int2),
-    .vccd1(vccd1),
-    .vssd1(vssd1));
  glbl_cfg u_glbl_cfg (.cfg_sdr_en(cfg_sdr_en),
     .mclk(wbd_clk_glbl),
     .reg_ack(wbd_glbl_ack_i),
     .reg_cs(wbd_glbl_stb_o),
     .reg_wr(wbd_glbl_we_o),
-    .reset_n(wbd_int2_rst_n),
+    .reset_n(wbd_int_rst_n),
     .sdr_init_done(sdr_init_done),
     .soft_irq(soft_irq),
     .vccd1(vccd1),
@@ -279,7 +251,7 @@ module user_project_wrapper (user_clock2,
     .m2_wbd_err_o(wbd_riscv_dmem_err_o),
     .m2_wbd_stb_i(wbd_riscv_dmem_stb_i),
     .m2_wbd_we_i(wbd_riscv_dmem_we_i),
-    .rst_n(wbd_int2_rst_n),
+    .rst_n(wbd_int_rst_n),
     .s0_wbd_ack_i(wbd_spim_ack_i),
     .s0_wbd_cyc_o(wbd_spim_cyc_o),
     .s0_wbd_stb_o(wbd_spim_stb_o),
@@ -1236,7 +1208,7 @@ module user_project_wrapper (user_clock2,
     .wb_ack_o(wbd_sdram_ack_i),
     .wb_clk_i(wbd_clk_sdram),
     .wb_cyc_i(wbd_sdram_cyc_o),
-    .wb_rst_n(wbd_int2_rst_n),
+    .wb_rst_n(wbd_int_rst_n),
     .wb_stb_i(wbd_sdram_stb_o),
     .wb_we_i(wbd_sdram_we_o),
     .vccd1(vccd1),
@@ -1520,7 +1492,7 @@ module user_project_wrapper (user_clock2,
     \wbd_sdram_sel_o[2] ,
     \wbd_sdram_sel_o[1] ,
     \wbd_sdram_sel_o[0] }));
- clk_skew_adjust u_skew_glbl (.clk_in(wbd_clk_int2),
+ clk_skew_adjust u_skew_glbl (.clk_in(wbd_clk_int),
     .clk_out(wbd_clk_glbl),
     .vccd1(vccd1),
     .vssd1(vssd1),
@@ -1552,7 +1524,7 @@ module user_project_wrapper (user_clock2,
     \cfg_clk_ctrl2[2] ,
     \cfg_clk_ctrl2[1] ,
     \cfg_clk_ctrl2[0] }));
- clk_skew_adjust u_skew_sdram (.clk_in(wbd_clk_int2),
+ clk_skew_adjust u_skew_sdram (.clk_in(wbd_clk_int),
     .clk_out(wbd_clk_sdram),
     .vccd1(vccd1),
     .vssd1(vssd1),
@@ -1568,7 +1540,7 @@ module user_project_wrapper (user_clock2,
     \cfg_clk_ctrl2[10] ,
     \cfg_clk_ctrl2[9] ,
     \cfg_clk_ctrl2[8] }));
- clk_skew_adjust u_skew_spi (.clk_in(wbd_clk_int2),
+ clk_skew_adjust u_skew_spi (.clk_in(wbd_clk_int),
     .clk_out(wbd_clk_spi),
     .vccd1(vccd1),
     .vssd1(vssd1),
@@ -1576,7 +1548,7 @@ module user_project_wrapper (user_clock2,
     \cfg_clk_ctrl1[14] ,
     \cfg_clk_ctrl1[13] ,
     \cfg_clk_ctrl1[12] }));
- clk_skew_adjust u_skew_uart (.clk_in(wbd_clk_int1),
+ clk_skew_adjust u_skew_uart (.clk_in(wbd_clk_int),
     .clk_out(wbd_clk_uart),
     .vccd1(vccd1),
     .vssd1(vssd1),
@@ -1592,7 +1564,7 @@ module user_project_wrapper (user_clock2,
     \cfg_clk_ctrl1[26] ,
     \cfg_clk_ctrl1[25] ,
     \cfg_clk_ctrl1[24] }));
- clk_skew_adjust u_skew_wi (.clk_in(wbd_clk_int1),
+ clk_skew_adjust u_skew_wi (.clk_in(wbd_clk_int),
     .clk_out(wbd_clk_wi),
     .vccd1(vccd1),
     .vssd1(vssd1),
@@ -1757,7 +1729,7 @@ module user_project_wrapper (user_clock2,
     \wbd_spim_sel_o[1] ,
     \wbd_spim_sel_o[0] }));
  uart_core u_uart_core (.app_clk(wbd_clk_uart),
-    .arst_n(wbd_int1_rst_n),
+    .arst_n(wbd_int_rst_n),
     .reg_ack(wbd_uart_ack_i),
     .reg_be(wbd_uart_sel_o),
     .reg_cs(wbd_uart_stb_o),
