@@ -22,7 +22,7 @@ module spim_top (mclk,
  input wbd_we_i;
  input vccd1;
  input vssd1;
- input [5:2] io_in;
+ input [3:0] io_in;
  output [5:0] io_oeb;
  output [5:0] io_out;
  output [31:0] spi_debug;
@@ -20788,7 +20788,7 @@ module spim_top (mclk,
     .VNB(vssd1),
     .VPB(vccd1),
     .VPWR(vccd1));
- sky130_fd_sc_hd__o22a_4 _07388_ (.A1(io_in[5]),
+ sky130_fd_sc_hd__o22a_4 _07388_ (.A1(io_in[3]),
     .A2(_03397_),
     .B1(\u_spictrl.u_rxreg.data_int[2] ),
     .B2(_03391_),
@@ -20831,7 +20831,7 @@ module spim_top (mclk,
     .VNB(vssd1),
     .VPB(vccd1),
     .VPWR(vccd1));
- sky130_fd_sc_hd__o22a_4 _07394_ (.A1(io_in[4]),
+ sky130_fd_sc_hd__o22a_4 _07394_ (.A1(io_in[2]),
     .A2(_03397_),
     .B1(\u_spictrl.u_rxreg.data_int[1] ),
     .B2(_03391_),
@@ -20874,7 +20874,7 @@ module spim_top (mclk,
     .VNB(vssd1),
     .VPB(vccd1),
     .VPWR(vccd1));
- sky130_fd_sc_hd__o22a_4 _07400_ (.A1(io_in[3]),
+ sky130_fd_sc_hd__o22a_4 _07400_ (.A1(io_in[1]),
     .A2(_03397_),
     .B1(\u_spictrl.u_rxreg.data_int[0] ),
     .B2(_02288_),
@@ -20917,9 +20917,9 @@ module spim_top (mclk,
     .VNB(vssd1),
     .VPB(vccd1),
     .VPWR(vccd1));
- sky130_fd_sc_hd__o22a_4 _07406_ (.A1(io_in[2]),
+ sky130_fd_sc_hd__o22a_4 _07406_ (.A1(io_in[0]),
     .A2(_02299_),
-    .B1(io_in[3]),
+    .B1(io_in[1]),
     .B2(_02288_),
     .X(_03415_),
     .VGND(vssd1),

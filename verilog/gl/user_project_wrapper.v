@@ -7,6 +7,12 @@ module user_project_wrapper (user_clock2,
     wbs_we_i,
     vccd1,
     vssd1,
+    vccd2,
+    vssd2,
+    vdda1,
+    vssa1,
+    vdda2,
+    vssa2,
     analog_io,
     io_in,
     io_oeb,
@@ -28,6 +34,12 @@ module user_project_wrapper (user_clock2,
  input wbs_we_i;
  input vccd1;
  input vssd1;
+ input vccd2;
+ input vssd2;
+ input vdda1;
+ input vssa1;
+ input vdda2;
+ input vssa2;
  inout [28:0] analog_io;
  input [37:0] io_in;
  output [37:0] io_oeb;
