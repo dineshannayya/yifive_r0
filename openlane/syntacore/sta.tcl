@@ -14,11 +14,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
 
-set ::env(LIB_FASTEST) "/home/dinesha/workarea/pdk/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"
-set ::env(LIB_SLOWEST) "/home/dinesha/workarea/pdk/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib"
-set ::env(CURRENT_NETLIST) /project/openlane/syntacore/runs/syntacore/results/lvs/scr1_top_wb.lvs.powered.v
+set ::env(LIB_FASTEST) "$::env(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"
+set ::env(LIB_SLOWEST) "$::env(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib"
+set ::env(CURRENT_NETLIST) ../user_project_wrapper/netlist/syntacore.v
 set ::env(DESIGN_NAME) "scr1_top_wb"
-set ::env(CURRENT_SPEF) /project/openlane/syntacore/runs/syntacore/results/routing/scr1_top_wb.spef
+set ::env(CURRENT_SPEF) ../../spef/scr1_top_wb.spef
 set ::env(BASE_SDC_FILE) "/project/openlane/syntacore/base.sdc"
 set ::env(SYNTH_DRIVING_CELL) "sky130_fd_sc_hd__inv_8"
 set ::env(SYNTH_DRIVING_CELL_PIN) "Y"
