@@ -57,6 +57,7 @@ TARGET_PATH=$(shell pwd)
 PDK_PATH=${PDK_ROOT}/sky130A
 VERIFY_COMMAND="cd ${TARGET_PATH}/verilog/dv/$* && export SIM=${SIM} && make"
 $(DV_PATTERNS): verify-% : ./verilog/dv/% 
+# PDK ROOT is not defined, then use pdk from docker at opt/riscv_64
 	@if [ ! -d "$(PDK_ROOT)" ]; then \
 	docker run -v ${TARGET_PATH}:${TARGET_PATH}  \
                 -v ${CARAVEL_ROOT}:${CARAVEL_ROOT} \
@@ -189,3 +190,5 @@ check-pdk:
 help:
 	cd $(CARAVEL_ROOT) && $(MAKE) help 
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
+
+
