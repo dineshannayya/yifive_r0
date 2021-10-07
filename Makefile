@@ -43,7 +43,7 @@ SUBMODULE?=1
 .PHONY: verify
 verify:
 	cd ./verilog/dv/ && \
-	export SIM=${SIM} && \
+	export SIM=${SIM} DUMP=${DUMP} && \
 		$(MAKE) -j$(THREADS)
 
 # Install DV setup
@@ -55,7 +55,7 @@ PATTERNS=$(shell cd verilog/dv && find * -maxdepth 0 -type d)
 DV_PATTERNS = $(foreach dv, $(PATTERNS), verify-$(dv))
 TARGET_PATH=$(shell pwd)
 PDK_PATH=${PDK_ROOT}/sky130A
-VERIFY_COMMAND="cd ${TARGET_PATH}/verilog/dv/$* && export SIM=${SIM} && make"
+VERIFY_COMMAND="cd ${TARGET_PATH}/verilog/dv/$* && export SIM=${SIM} DUMP=${DUMP} && make"
 $(DV_PATTERNS): verify-% : ./verilog/dv/% 
 # PDK ROOT is not defined, then use pdk from docker at opt/riscv_64
 	@if [ ! -d "$(PDK_ROOT)" ]; then \
@@ -78,7 +78,7 @@ $(DV_PATTERNS): verify-% : ./verilog/dv/%
 BLOCKS = $(shell cd openlane && find * -maxdepth 0 -type d)
 .PHONY: $(BLOCKS)
 $(BLOCKS): %:
-	cd openlane && $(MAKE) $*
+	export CARAVEL_ROOT=$(CARAVEL_ROOT) && cd openlane && $(MAKE) $*
 
 # Install caravel
 .PHONY: install
@@ -190,5 +190,4 @@ check-pdk:
 help:
 	cd $(CARAVEL_ROOT) && $(MAKE) help 
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
-
 

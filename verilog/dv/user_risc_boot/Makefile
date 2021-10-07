@@ -45,6 +45,7 @@ PDK_PATH?=/ef/tech/SW/sky130A
 
 ## Simulation mode: RTL/GL
 SIM?=RTL
+DUMP?=OFF
 
 .SUFFIXES:
 
@@ -64,6 +65,7 @@ vvp:  ${PATTERN:=.vvp}
 	${GCC64_PREFIX}-objdump -D user_risc_boot.elf > user_risc_boot.dump
 	rm crt_tcm.o user_risc_boot.o
 ifeq ($(SIM),RTL)
+   ifeq ($(DUMP),OFF)
 	iverilog -g2005-sv -DFUNCTIONAL -DSIM -I $(PDK_PATH) \
 	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) \
 	-I $(UPRJ_BEHAVIOURAL_MODELS)    -I $(UPRJ_RTL_PATH) -I $(UPRJ_VERILOG_PATH) \
@@ -71,6 +73,15 @@ ifeq ($(SIM),RTL)
 	-I $(UPRJ_INCLUDE_PATH1)    -I $(UPRJ_INCLUDE_PATH2) -I $(UPRJ_INCLUDE_PATH3) \
 	-I $(UPRJ_INCLUDE_PATH4) \
 	$< -o $@ 
+    else  
+	iverilog -g2005-sv -DWFDUMP -DFUNCTIONAL -DSIM -I $(PDK_PATH) \
+	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) \
+	-I $(UPRJ_BEHAVIOURAL_MODELS)    -I $(UPRJ_RTL_PATH) -I $(UPRJ_VERILOG_PATH) \
+	-I $(UPRJ_BEHAVIOURAL_AGENTS)    \
+	-I $(UPRJ_INCLUDE_PATH1)    -I $(UPRJ_INCLUDE_PATH2) -I $(UPRJ_INCLUDE_PATH3) \
+	-I $(UPRJ_INCLUDE_PATH4) \
+	$< -o $@ 
+   endif
 else  
 	iverilog -g2005-sv -DFUNCTIONAL -DSIM -DGL -I $(PDK_PATH) \
 	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) -I $(CARAVEL_VERILOG_PATH) \
