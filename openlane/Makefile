@@ -18,8 +18,8 @@ BLOCKS = $(shell find * -maxdepth 0 -type d)
 CONFIG = $(foreach block,$(BLOCKS), ./$(block)/config.tcl)
 CLEAN = $(foreach block,$(BLOCKS), clean-$(block))
 
-OPENLANE_TAG ?= rc7
-OPENLANE_IMAGE_NAME ?= dineshannayya/openlane:$(OPENLANE_TAG)
+OPENLANE_TAG = rc7
+OPENLANE_IMAGE_NAME = dineshannayya/openlane:$(OPENLANE_TAG)
 OPENLANE_BASIC_COMMAND = "cd /project/openlane && flow.tcl -design ./$* -save_path .. -save -tag $* -overwrite"
 OPENLANE_INTERACTIVE_COMMAND = "cd /project/openlane && flow.tcl -it -file ./$*/interactive.tcl -design ./$* -save_path .. -save -tag $* -overwrite"
 
@@ -30,51 +30,33 @@ $(CONFIG) :
 	@exit 1
 
 $(BLOCKS) : % : ./%/config.tcl FORCE
-ifeq ($(OPENLANE_ROOT),)
-	@echo "Please export OPENLANE_ROOT"
-	@exit 1
-endif
+#ifeq ($(OPENLANE_ROOT),)
+#	@echo "Please export OPENLANE_ROOT"
+#	@exit 1
+#endif
 #ifeq ($(PDK_ROOT),)
 #	@echo "Please export PDK_ROOT"
 #	@exit 1
 #endif
 	@echo "############ Running Command #####################"
+	@echo "docker run -it \
+		-v $(PWD)/..:/project \
+		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
+		$(OPENLANE_IMAGE_NAME) sh -c " $(OPENLANE_BASIC_COMMAND)
 	@sleep 1
 
-#if PDK root is not defines, then use the PDK ROOT inside docker /opt/pdk
-ifneq ($(PDK_ROOT), 1)
+#Pick PDK_ROOT from local path
 	@if [ -f ./$*/interactive.tcl ]; then\
-		docker run -it -v $(OPENLANE_ROOT):/openLANE_flow \
+		docker run -it \
 		-v $(PWD)/..:/project \
 		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
 		$(OPENLANE_IMAGE_NAME) sh -c $(OPENLANE_INTERACTIVE_COMMAND);\
 	else\
-		docker run -it -v $(OPENLANE_ROOT):/openLANE_flow \
+		docker run -it \
 		-v $(PWD)/..:/project \
 		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
 		$(OPENLANE_IMAGE_NAME) sh -c $(OPENLANE_BASIC_COMMAND);\
-	fi 
-endif
-
-#if PDK_ROOT define, then pick the local path
-ifeq ($(PDK_ROOT), 1)
-	@if [ -f ./$*/interactive.tcl ]; then\
-		docker run -it -v $(OPENLANE_ROOT):/openLANE_flow \
-		-v $(PDK_ROOT):$(PDK_ROOT) \
-		-v $(PWD)/..:/project \
-		-e PDK_ROOT=$(PDK_ROOT) \
-		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
-		$(OPENLANE_IMAGE_NAME) sh -c $(OPENLANE_INTERACTIVE_COMMAND);\
-	else\
-		docker run -it -v $(OPENLANE_ROOT):/openLANE_flow \
-		-v $(PDK_ROOT):$(PDK_ROOT) \
-		-v $(PWD)/..:/project \
-		-e PDK_ROOT=$(PDK_ROOT) \
-		-u $(shell id -u $(USER)):$(shell id -g $(USER)) \
-		$(OPENLANE_IMAGE_NAME) sh -c $(OPENLANE_BASIC_COMMAND);\
-	fi 
-endif
-
+	fi
 	mkdir -p ../signoff/$*/
 	cp $*/runs/$*/OPENLANE_VERSION ../signoff/$*/
 	cp $*/runs/$*/PDK_SOURCES ../signoff/$*/
