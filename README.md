@@ -1,5 +1,5 @@
 ```
-  YiFive SOC
+  YiFive A1 SOC
 
 
 Permission to use, copy, modify, and/or distribute this soc for any

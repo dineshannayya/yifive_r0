@@ -77,6 +77,10 @@
 `include "uprj_netlists.v"
 `include "mt48lc8m8a2.v"
 
+`define ADDR_SPACE_UART  32'h1001_0000
+`define ADDR_SPACE_I2C   32'h1001_0000
+`define ADDR_SPACE_GLBL  32'h1002_0000
+
 module user_risc_boot_tb;
 	reg clock;
 	reg wb_rst_i;
@@ -136,22 +140,22 @@ module user_risc_boot_tb;
 	        repeat (10) @(posedge clock);
 		$display("Monitor: Standalone User Risc Boot Test Started");
 
-		   // Remove Wb Reset
+	           // Remove Wb Reset
 		   wb_user_core_write('h3080_0000,'h1);
 
-		#1;
-		//------------ SDRAM Config - 2
-                wb_user_core_write('h3000_0014,'h100_019E);
+		   #1;
+		   //------------ SDRAM Config - 2
+                   wb_user_core_write(`ADDR_SPACE_GLBL+8'h14,'h100_019E);
 
-	        repeat (2) @(posedge clock);
-		#1;
-		//------------ SDRAM Config - 1
-                wb_user_core_write('h3000_0010,'h2F17_2242);
+	           repeat (2) @(posedge clock);
+		   #1;
+		   //------------ SDRAM Config - 1
+                   wb_user_core_write(`ADDR_SPACE_GLBL+8'h10,'h2F17_2266);
 
-	        repeat (2) @(posedge clock);
-		#1;
-		// Remove all the reset
-                wb_user_core_write('h3080_0000,'hF);
+	           repeat (2) @(posedge clock);
+		   #1;
+		   // Remove all the reset
+                   wb_user_core_write('h3080_0000,'hF);
 
 
 		// Repeat cycles of 1000 clock edges as needed to complete testbench
@@ -168,27 +172,16 @@ module user_risc_boot_tb;
                 // 0x3000001C  = 0x22334455; 
                 // 0x30000020  = 0x33445566; 
                 // 0x30000024  = 0x44556677; 
-                // 0x30000028 = 0x55667788; 
-                // 0x3000002C = 0x66778899; 
+                // 0x30000028  = 0x55667788; 
+                // 0x3000002C  = 0x66778899; 
 
                 test_fail = 0;
-		wb_user_core_read(32'h30000018,read_data);
-		if(read_data != 32'h11223344) test_fail = 1;
-
-		wb_user_core_read(32'h3000001C,read_data);
-		if(read_data != 32'h22334455) test_fail = 1;
-
-		wb_user_core_read(32'h30000020,read_data);
-	        if(read_data != 32'h33445566) test_fail = 1;
-
-		wb_user_core_read(32'h30000024,read_data);
-                if(read_data!= 32'h44556677) test_fail = 1;
-
-		wb_user_core_read(32'h30000028,read_data);
-                if(read_data!= 32'h55667788) test_fail = 1;
-
-		wb_user_core_read(32'h3000002C,read_data) ;
-	        if(read_data != 32'h66778899) test_fail = 1;
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h18,read_data,32'h11223344);
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h1C,read_data,32'h22334455);
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h20,read_data,32'h33445566);
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h24,read_data,32'h44556677);
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h28,read_data,32'h55667788);
+		wb_user_core_read_check(`ADDR_SPACE_GLBL+8'h2C,read_data,32'h66778899);
 
 	   
 	    	$display("###################################################");
@@ -238,7 +231,7 @@ user_project_wrapper u_top(
 
  
     // Logic Analyzer Signals
-    .la_data_in      ('0) ,
+    .la_data_in      ('1) ,
     .la_data_out     (),
     .la_oenb         ('0),
  
@@ -255,117 +248,6 @@ user_project_wrapper u_top(
 `ifndef GL // Drive Power for Hold Fix Buf
     // All standard cell need power hook-up for functionality work
     initial begin
-	force u_top.u_spi_master.u_delay1_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio0.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio0.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio0.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio0.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio0.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio0.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio0.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio0.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio1.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio1.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio1.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio1.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio1.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio1.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio1.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio1.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio2.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio2.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio2.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio2.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio2.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio2.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio2.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio2.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio3.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio3.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio3.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio3.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio3.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio3.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio3.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio3.VNB    =VSS;
-          
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPWR =USER_VDD1V8;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPB  =USER_VDD1V8;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VGND =VSS;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_wb_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_wb_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_wb_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_wb_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_cpu_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_cpu_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_cpu_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_cpu_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_spi_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_spi_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_spi_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_spi_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_sdram_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_sdram_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_sdram_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_sdram_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_uart_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_uart_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_uart_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_uart_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_i2cm_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_usb_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_usb_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_usb_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_usb_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_sdram.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_sdram.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_sdram.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_sdram.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_cpu.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_cpu.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_cpu.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_cpu.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_rtc.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_rtc.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_rtc.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_rtc.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_usb.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_usb.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_usb.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_usb.VNB = VSS;
     end
 `endif    
 
@@ -507,6 +389,40 @@ begin
   wbd_ext_dat_i ='h0;  // data output
   wbd_ext_sel_i ='h0;  // byte enable
   $display("DEBUG WB USER ACCESS READ Address : %x, Data : %x",address,data);
+  repeat (2) @(posedge clock);
+end
+endtask
+
+task  wb_user_core_read_check;
+input [31:0] address;
+output [31:0] data;
+input [31:0] cmp_data;
+reg    [31:0] data;
+begin
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_adr_i =address;  // address
+  wbd_ext_we_i  ='h0;  // write
+  wbd_ext_dat_i ='0;  // data output
+  wbd_ext_sel_i ='hF;  // byte enable
+  wbd_ext_cyc_i ='h1;  // strobe/request
+  wbd_ext_stb_i ='h1;  // strobe/request
+  wait(wbd_ext_ack_o == 1);
+  data  = wbd_ext_dat_o;  
+  repeat (1) @(posedge clock);
+  #1;
+  wbd_ext_cyc_i ='h0;  // strobe/request
+  wbd_ext_stb_i ='h0;  // strobe/request
+  wbd_ext_adr_i ='h0;  // address
+  wbd_ext_we_i  ='h0;  // write
+  wbd_ext_dat_i ='h0;  // data output
+  wbd_ext_sel_i ='h0;  // byte enable
+  if(data !== cmp_data) begin
+     $display("ERROR : WB USER ACCESS READ  Address : 0x%x, Exd: 0x%x Rxd: 0x%x ",address,cmp_data,data);
+     test_fail = 1;
+  end else begin
+     $display("STATUS: WB USER ACCESS READ  Address : 0x%x, Data : 0x%x",address,data);
+  end
   repeat (2) @(posedge clock);
 end
 endtask

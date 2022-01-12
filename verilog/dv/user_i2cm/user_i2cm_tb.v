@@ -71,8 +71,8 @@
 `include "i2c_slave_model.v"
 
 
-`define ADDR_SPACE_UART  32'h3001_0000
-`define ADDR_SPACE_I2CM  32'h3001_0000
+`define ADDR_SPACE_UART  32'h1001_0000
+`define ADDR_SPACE_I2CM  32'h1001_0000
 
 
 module tb_top;
@@ -325,7 +325,7 @@ user_project_wrapper u_top(
 
  
     // Logic Analyzer Signals
-    .la_data_in      ('0) ,
+    .la_data_in      ('1) ,
     .la_data_out     (),
     .la_oenb         ('0),
  
@@ -342,117 +342,6 @@ user_project_wrapper u_top(
 `ifndef GL // Drive Power for Hold Fix Buf
     // All standard cell need power hook-up for functionality work
     initial begin
-	force u_top.u_spi_master.u_delay1_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio0.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio0.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio0.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio0.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio0.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio0.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio0.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio0.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio0.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio0.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio1.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio1.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio1.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio1.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio1.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio1.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio1.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio1.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio1.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio1.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio2.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio2.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio2.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio2.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio2.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio2.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio2.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio2.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio2.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio2.VNB    =VSS;
-
-	force u_top.u_spi_master.u_delay1_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay1_sdio3.VGND =VSS;
-	force u_top.u_spi_master.u_delay1_sdio3.VNB = VSS;
-	force u_top.u_spi_master.u_delay2_sdio3.VPWR =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio3.VPB  =USER_VDD1V8;
-	force u_top.u_spi_master.u_delay2_sdio3.VGND =VSS;
-	force u_top.u_spi_master.u_delay2_sdio3.VNB = VSS;
-	force u_top.u_spi_master.u_buf_sdio3.VPWR   =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio3.VPB    =USER_VDD1V8;
-	force u_top.u_spi_master.u_buf_sdio3.VGND   =VSS;
-	force u_top.u_spi_master.u_buf_sdio3.VNB    =VSS;
-          
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPWR =USER_VDD1V8;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPB  =USER_VDD1V8;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VGND =VSS;
-	force u_top.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_wb_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_wb_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_wb_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_wb_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_cpu_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_cpu_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_cpu_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_cpu_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_spi_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_spi_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_spi_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_spi_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_sdram_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_sdram_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_sdram_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_sdram_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_uart_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_uart_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_uart_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_uart_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_i2cm_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_i2cm_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_buf_usb_rst.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_usb_rst.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_buf_usb_rst.VGND =VSS;
-	force u_top.u_wb_host.u_buf_usb_rst.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_sdram.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_sdram.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_sdram.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_sdram.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_cpu.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_cpu.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_cpu.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_cpu.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_rtc.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_rtc.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_rtc.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_rtc.VNB = VSS;
-
-	force u_top.u_wb_host.u_clkbuf_usb.VPWR =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_usb.VPB  =USER_VDD1V8;
-	force u_top.u_wb_host.u_clkbuf_usb.VGND =VSS;
-	force u_top.u_wb_host.u_clkbuf_usb.VNB = VSS;
     end
 `endif    
 //------------------------------------------------------

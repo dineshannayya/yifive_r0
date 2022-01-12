@@ -15,12 +15,14 @@
 # SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
 
 
-set ::env(LIB_FASTEST) "/home/dinesha/workarea/pdk/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"
 set ::env(LIB_SLOWEST) "/home/dinesha/workarea/pdk/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib"
-set ::env(CURRENT_NETLIST) /project/openlane/spi_master/runs/spi_master/results/lvs/spim_top.lvs.powered.v
+set ::env(LIB_FASTEST) "$::env(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"
+set ::env(LIB_TYPICAL) "$::env(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
+set ::env(LIB_SLOWEST) "$::env(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib"
+set ::env(CURRENT_NETLIST) ../user_project_wrapper/netlist/spi_master.v
 set ::env(DESIGN_NAME) "spim_top"
-set ::env(CURRENT_SPEF) /project/openlane/spi_master/runs/spi_master/results/routing/spim_top.spef
-set ::env(BASE_SDC_FILE) "/project/openlane/spi_master/base.sdc"
+set ::env(CURRENT_SPEF) ../../spef/spim_top.spef
+set ::env(BASE_SDC_FILE) "base.sdc"
 set ::env(SYNTH_DRIVING_CELL) "sky130_fd_sc_hd__inv_8"
 set ::env(SYNTH_DRIVING_CELL_PIN) "Y"
 set ::env(SYNTH_CAP_LOAD) "17.65"
@@ -28,8 +30,10 @@ set ::env(WIRE_RC_LAYER) "met1"
 
 
 set_cmd_units -time ns -capacitance pF -current mA -voltage V -resistance kOhm -distance um
-read_liberty -min $::env(LIB_FASTEST)
-read_liberty -max $::env(LIB_SLOWEST)
+define_corners wc bc tt
+read_liberty -corner bc $::env(LIB_FASTEST)
+read_liberty -corner wc $::env(LIB_SLOWEST)
+read_liberty -corner tt $::env(LIB_TYPICAL)
 read_verilog $::env(CURRENT_NETLIST)
 link_design  $::env(DESIGN_NAME)
 
@@ -46,43 +50,47 @@ set_propagated_clock [all_clocks]
 
 report_tns
 report_wns
-report_power 
-report_checks -unique -slack_max -0.0 -group_count 100 
-report_checks -unique -slack_min -0.0 -group_count 100 
+#report_power 
+#
+echo "################ CORNER : WC (MAX) TIMING Report ###################"                                                > timing_ss_max.rpt
+report_checks -unique          -path_delay max -slack_max -0.0 -group_count 100   -corner wc  -format full_clock_expanded >> timing_ss_max.rpt
+report_checks -group_count 100 -path_delay max  -path_group  mclk                 -corner wc  -format full_clock_expanded >> timing_ss_max.rpt
+report_checks -group_count 100 -path_delay max  -path_group  spiclk               -corner wc  -format full_clock_expanded >> timing_ss_max.rpt
+report_checks                  -path_delay max                                    -corner wc                              >> timing_ss_max.rpt
+
+echo "################ CORNER : WC (MIN) TIMING Report ###################"                                                > timing_ss_min.rpt
+report_checks -unique          -path_delay min -slack_max -0.0 -group_count 100   -corner wc  -format full_clock_expanded >> timing_ss_min.rpt
+report_checks -group_count 100 -path_delay min  -path_group  mclk                 -corner wc  -format full_clock_expanded >> timing_ss_min.rpt
+report_checks -group_count 100 -path_delay min  -path_group  spiclk               -corner wc  -format full_clock_expanded >> timing_ss_min.rpt
+report_checks                  -path_delay min                                    -corner wc                              >> timing_ss_min.rpt
+
+echo "################ CORNER : BC (MAX) TIMING Report ###################"                                                > timing_ff_min.rpt
+report_checks -unique           -path_delay min -slack_min -0.0 -group_count 100  -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  mclk                 -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  spiclk               -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks                   -path_delay min                                   -corner bc                              >> timing_ff_min.rpt
+
+echo "################ CORNER : BC (MIN) TIMING Report ###################"                                                > timing_ff_min.rpt
+report_checks -unique           -path_delay min -slack_min -0.0 -group_count 100  -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  mclk                 -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  spiclk               -corner bc  -format full_clock_expanded >> timing_ff_min.rpt
+report_checks                   -path_delay min                                   -corner bc                              >> timing_ff_min.rpt
+
+echo "################ CORNER : TT (MAX) TIMING Report ###################"                                                > timing_tt_max.rpt 
+report_checks -unique           -path_delay max -slack_min -0.0 -group_count 100 -corner tt  -format full_clock_expanded  >> timing_tt_max.rpt
+report_checks -group_count 100  -path_delay max -path_group mclk                 -corner tt  -format full_clock_expanded  >> timing_tt_max.rpt
+report_checks -group_count 100  -path_delay max -path_group spiclk               -corner tt  -format full_clock_expanded  >> timing_tt_max.rpt
+report_checks -path_delay max  -corner tt >> timing_tt_max.rpt
+
+echo "################ CORNER : TT (MIN) TIMING Report ###################"                                                > timing_tt_min.rpt
+report_checks -unique           -path_delay min -slack_min -0.0 -group_count 100 -corner tt  -format full_clock_expanded  >> timing_tt_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  mclk                -corner tt  -format full_clock_expanded  >> timing_tt_min.rpt
+report_checks -group_count 100  -path_delay min -path_group  spiclk              -corner tt  -format full_clock_expanded  >> timing_tt_min.rpt
+report_checks                   -path_delay min                                  -corner tt                               >> timing_tt_min.rpt
+
+
+
+
 report_checks -path_delay min_max 
-report_checks -group_count 100  -slack_max -0.01  > timing.rpt
 
-report_checks -group_count 100  -slack_min -0.01 >> timing.rpt
-
-
-report_checks -to [get_port io_out[5]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_out[4]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_out[3]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_out[2]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_out[1]] -path_delay min >> timing.rpt
-
-report_checks -to [get_port io_out[5]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_out[4]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_out[3]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_out[2]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_out[1]] -path_delay max >> timing.rpt
-
-report_checks -to [get_port io_oeb[5]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_oeb[4]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_oeb[3]] -path_delay min >> timing.rpt
-report_checks -to [get_port io_oeb[2]] -path_delay min >> timing.rpt
-
-report_checks -to [get_port io_oeb[5]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_oeb[4]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_oeb[3]] -path_delay max >> timing.rpt
-report_checks -to [get_port io_oeb[2]] -path_delay max >> timing.rpt
-
-report_checks -from [get_port io_in[5]] -path_delay min >> timing.rpt
-report_checks -from [get_port io_in[4]] -path_delay min >> timing.rpt
-report_checks -from [get_port io_in[3]] -path_delay min >> timing.rpt
-report_checks -from [get_port io_in[2]] -path_delay min >> timing.rpt
-
-report_checks -from [get_port io_in[5]] -path_delay max >> timing.rpt
-report_checks -from [get_port io_in[4]] -path_delay max >> timing.rpt
-report_checks -from [get_port io_in[3]] -path_delay max >> timing.rpt
-report_checks -from [get_port io_in[2]] -path_delay max >> timing.rpt
+#exit

@@ -152,52 +152,65 @@ module risc_boot_tb;
            uart_fifo_enable        = 0;	// fifo mode disable
         
            #200; // Wait for reset removal
-          
-	   // Wait for Managment core to boot up 
-	   wait(checkbits == 16'h AB60);
-	   $display("Monitor: Test User Risc Boot Started");
-       
-	   // Wait for user risc core to boot up 
-           repeat (25000) @(posedge clock);  
-           tb_uart.uart_init;
-           tb_uart.control_setup (uart_data_bit, uart_stop_bits, uart_parity_en, uart_even_odd_parity, 
-        	                          uart_stick_parity, uart_timeout, uart_divisor);
-           
-           for (i=0; i<40; i=i+1)
-           	uart_write_data[i] = $random;
-           
-           
-           
+
            fork
-              begin
-                 for (i=0; i<40; i=i+1)
+	   begin
+          
+	      // Wait for Managment core to boot up 
+	      wait(checkbits == 16'h AB60);
+	      $display("Monitor: Test User Risc Boot Started");
+       
+	      // Wait for user risc core to boot up 
+              repeat (25000) @(posedge clock);  
+              tb_uart.uart_init;
+              tb_uart.control_setup (uart_data_bit, uart_stop_bits, uart_parity_en, uart_even_odd_parity, 
+                                             uart_stick_parity, uart_timeout, uart_divisor);
+              
+              for (i=0; i<40; i=i+1)
+              	uart_write_data[i] = $random;
+              
+              
+              
+              fork
                  begin
-                   $display ("\n... UART Agent Writing char %x ...", uart_write_data[i]);
-                    tb_uart.write_char (uart_write_data[i]);
+                    for (i=0; i<40; i=i+1)
+                    begin
+                      $display ("\n... UART Agent Writing char %x ...", uart_write_data[i]);
+                       tb_uart.write_char (uart_write_data[i]);
+                    end
                  end
-              end
-           
-              begin
-                 for (j=0; j<40; j=j+1)
+              
                  begin
-                   tb_uart.read_char_chk(uart_write_data[j]);
+                    for (j=0; j<40; j=j+1)
+                    begin
+                      tb_uart.read_char_chk(uart_write_data[j]);
+                    end
                  end
+                 join
+              
+                 #100
+                 tb_uart.report_status(uart_rx_nu, uart_tx_nu);
+              
+                 test_fail = 0;
+        
+                 // Check 
+                 // if all the 40 byte transmitted
+                 // if all the 40 byte received
+                 // if no error 
+                 if(uart_tx_nu != 40) test_fail = 1;
+                 if(uart_rx_nu != 40) test_fail = 1;
+                 if(tb_uart.err_cnt != 0) test_fail = 1;
+        
+	      end
+	      begin
+                   // Loop for TimeOut
+                   repeat (60000) @(posedge clock);
+                		// $display("+1000 cycles");
+                   test_fail = 1;
               end
-              join
-           
-              #100
-              tb_uart.report_status(uart_rx_nu, uart_tx_nu);
-           
-              test_fail = 0;
-        
-              // Check 
-              // if all the 40 byte transmitted
-              // if all the 40 byte received
-              // if no error 
-              if(uart_tx_nu != 40) test_fail = 1;
-              if(uart_rx_nu != 40) test_fail = 1;
-              if(tb_uart.err_cnt != 0) test_fail = 1;
-        
+              join_any
+              disable fork; //disable pending fork activity
+
               $display("###################################################");
               if(test_fail == 0) begin
                  `ifdef GL
@@ -384,120 +397,7 @@ uart_agent tb_uart(
 `ifndef GL // Drive Power for Hold Fix Buf
     // All standard cell need power hook-up for functionality work
     initial begin
-	force uut.mprj.u_spi_master.u_delay1_sdio0.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio0.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio0.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay1_sdio0.VNB  = VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio0.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio0.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio0.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio0.VNB  = VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio0.VPWR    =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio0.VPB     =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio0.VGND    =VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio0.VNB     =VSS;
-
-
-	force uut.mprj.u_spi_master.u_delay1_sdio1.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio1.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio1.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay1_sdio1.VNB = VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio1.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio1.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio1.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio1.VNB = VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio1.VPWR    =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio1.VPB     =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio1.VGND    =VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio1.VNB     =VSS;
-
-	force uut.mprj.u_spi_master.u_delay1_sdio2.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio2.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio2.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay1_sdio2.VNB = VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio2.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio2.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio2.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio2.VNB = VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio2.VPWR    =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio2.VPB     =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio2.VGND    =VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio2.VNB     =VSS;
-
-	force uut.mprj.u_spi_master.u_delay1_sdio3.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio3.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay1_sdio3.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay1_sdio3.VNB = VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio3.VPWR =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio3.VPB  =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_delay2_sdio3.VGND =VSS;
-	force uut.mprj.u_spi_master.u_delay2_sdio3.VNB = VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio3.VPWR    =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio3.VPB     =USER_VDD1V8;
-	force uut.mprj.u_spi_master.u_buf_sdio3.VGND    =VSS;
-	force uut.mprj.u_spi_master.u_buf_sdio3.VNB     =VSS;
-          
-	force uut.mprj.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPWR =USER_VDD1V8;
-	force uut.mprj.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VPB  =USER_VDD1V8;
-	force uut.mprj.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VGND =VSS;
-	force uut.mprj.u_uart_i2c_usb.u_uart_core.u_lineclk_buf.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_wb_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_wb_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_wb_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_wb_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_cpu_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_cpu_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_cpu_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_cpu_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_spi_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_spi_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_spi_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_spi_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_sdram_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_sdram_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_sdram_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_sdram_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_uart_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_uart_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_uart_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_uart_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_i2cm_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_i2cm_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_i2cm_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_i2cm_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_buf_usb_rst.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_usb_rst.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_buf_usb_rst.VGND =VSS;
-	force uut.mprj.u_wb_host.u_buf_usb_rst.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_clkbuf_sdram.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_sdram.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_sdram.VGND =VSS;
-	force uut.mprj.u_wb_host.u_clkbuf_sdram.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_clkbuf_cpu.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_cpu.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_cpu.VGND =VSS;
-	force uut.mprj.u_wb_host.u_clkbuf_cpu.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_clkbuf_rtc.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_rtc.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_rtc.VGND =VSS;
-	force uut.mprj.u_wb_host.u_clkbuf_rtc.VNB = VSS;
-
-	force uut.mprj.u_wb_host.u_clkbuf_usb.VPWR =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_usb.VPB  =USER_VDD1V8;
-	force uut.mprj.u_wb_host.u_clkbuf_usb.VGND =VSS;
-	force uut.mprj.u_wb_host.u_clkbuf_usb.VNB = VSS;
-
-    end
+	end
 `endif    
 
 

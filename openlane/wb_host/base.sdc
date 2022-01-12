@@ -1,84 +1,101 @@
-# SPDX-FileCopyrightText:  2021 , Dinesh Annayya
+###############################################################################
+# Created by write_sdc
+# Sat Nov 13 02:44:28 2021
+###############################################################################
+current_design wb_host
+###############################################################################
+# Timing Constraints
+###############################################################################
+create_clock -name wbm_clk_i -period 10.0000 [get_ports {wbm_clk_i}]
+create_clock -name wbs_clk_i -period 10.0000 [get_ports {wbs_clk_i}]
+
+set_clock_transition 0.1500 [all_clocks]
+set_clock_uncertainty -setup 0.2500 [all_clocks]
+set_clock_uncertainty -hold 0.2500 [all_clocks]
+
+set_clock_groups -name async_clock -asynchronous \
+ -group [get_clocks {wbs_clk_i}]\
+ -group [get_clocks {wbm_clk_i}] -comment {Async Clock group}
+
+### ClkSkew Adjust
+set_case_analysis 0 [get_ports {cfg_cska_wh[0]}]
+set_case_analysis 0 [get_ports {cfg_cska_wh[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_wh[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_wh[3]}]
+
+
+set_max_delay   3.5 -from [get_ports {wbd_clk_int}]
+set_max_delay   2 -to   [get_ports {wbd_clk_wh}]
+set_max_delay 3.5 -from wbd_clk_int -to wbd_clk_wh
+
+### WBM I/F
+#Strobe is registered inside the wb_host before generating chip select
+# So wbm_adr_i  wbm_we_i wbm_sel_i wbm_dat_i are having 2 cycle setup
+set_multicycle_path -setup  -from [get_ports {wbm_adr_i[*]}] 2
+set_multicycle_path -setup  -from [get_ports {wbm_cyc_i}]  2
+set_multicycle_path -setup  -from [get_ports {wbm_dat_i[*]}] 2
+set_multicycle_path -setup  -from [get_ports {wbm_sel_i[*]}] 2
+set_multicycle_path -setup  -from [get_ports {wbm_we_i}] 2
+
+set_multicycle_path -hold  -from [get_ports {wbm_adr_i[*]}] 2
+set_multicycle_path -hold  -from [get_ports {wbm_cyc_i}]  2
+set_multicycle_path -hold  -from [get_ports {wbm_dat_i[*]}] 2
+set_multicycle_path -hold  -from [get_ports {wbm_sel_i[*]}] 2
+set_multicycle_path -hold  -from [get_ports {wbm_we_i}] 2
+
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
+set_input_delay 5.0000 -clock [get_clocks {wbm_clk_i}] -max -add_delay [get_ports {wbm_rst_i}]
+set_input_delay 5.0000 -clock [get_clocks {wbm_clk_i}] -max -add_delay [get_ports {wbm_stb_i}]
 
+set_input_delay 1.0000 -clock [get_clocks {wbm_clk_i}] -min -add_delay [get_ports {wbm_rst_i}]
+set_input_delay 1.0000 -clock [get_clocks {wbm_clk_i}] -min -add_delay [get_ports {wbm_stb_i}]
 
-set_units -time ns
-set ::env(WBM_CLOCK_PERIOD) "10"
-set ::env(WBM_CLOCK_PORT)   "wbm_clk_i"
-set ::env(WBM_CLOCK_NAME)   "wbm_clk_i"
+set_output_delay -max 5.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_ack_o}]
+set_output_delay -max 5.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_dat_o[*]}]
+set_output_delay -max 5.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_err_o}]
 
-set ::env(WBS_CLOCK_PERIOD) "10"
-set ::env(WBS_CLOCK_PORT)   "wbs_clk_i"
-set ::env(WBS_CLOCK_NAME)   "wbs_clk_i"
+set_output_delay -min 1.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_ack_o}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_dat_o[*]}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbm_clk_i}] -add_delay [get_ports {wbm_err_o}]
+# WBS I/F
+set_input_delay -max 6.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_ack_i}]
+set_input_delay -max 6.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_dat_i[*]}]
 
-######################################
-# WB Clock domain input output
-######################################
-create_clock [get_ports $::env(WBM_CLOCK_PORT)]  -name $::env(WBM_CLOCK_PORT)  -period $::env(WBM_CLOCK_PERIOD)
-create_clock [get_ports $::env(WBS_CLOCK_PORT)]  -name $::env(WBS_CLOCK_PORT)  -period $::env(WBS_CLOCK_PERIOD)
+set_input_delay -min 2.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_ack_i}]
+set_input_delay -min 2.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_dat_i[*]}]
 
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_adr_o[*]}]
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_cyc_o}]
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_dat_o[*]}]
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_sel_o[*]}]
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_stb_o}]
+set_output_delay -max 4.5000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_we_o}]
 
-set wb_input_delay_value [expr $::env(WBM_CLOCK_PERIOD) * 0.6]
-set wb_output_delay_value [expr $::env(WBM_CLOCK_PERIOD) * 0.6]
-puts "\[INFO\]: Setting wb output delay to:$wb_output_delay_value"
-puts "\[INFO\]: Setting wb input delay to: $wb_input_delay_value"
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_adr_o[*]}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_cyc_o}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_dat_o[*]}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_sel_o[*]}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_stb_o}]
+set_output_delay -min 1.0000 -clock [get_clocks {wbs_clk_i}] -add_delay [get_ports {wbs_we_o}]
 
-
-set_input_delay 2.0 -clock [get_clocks $::env(WBM_CLOCK_PORT)] {wbm_rst_i}
-set_input_delay 2.0 -clock [get_clocks $::env(WBM_CLOCK_PORT)] {wbm_rst_i}
-
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_cyc_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_stb_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_adr_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_we_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_dat_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_sel_i*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_dat_o*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_ack_o*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WBM_CLOCK_PORT)] [get_port wbm_err_o*]
-
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_cyc_o*]
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_stb_o*]
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_adr_o*]
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_we_o*]
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_dat_o*]
-set_output_delay 4.5   -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_sel_o*]
-
-set_input_delay $wb_output_delay_value  -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_dat_i*]
-set_input_delay $wb_output_delay_value  -clock [get_clocks $::env(WBS_CLOCK_PORT)] [get_port wbs_ack_i*]
-
-
-# WBM and WBS are async to each other
-set_clock_groups -name async_clock -asynchronous -comment "Async Clock group" -group [get_clocks $::env(WBM_CLOCK_PORT)] -group [get_clocks $::env(WBS_CLOCK_NAME)]
-
-set_clock_uncertainty -from $::env(WBM_CLOCK_NAME)          -to $::env(WBM_CLOCK_NAME)    -setup 0.400
-set_clock_uncertainty -from $::env(WBS_CLOCK_NAME)          -to $::env(WBS_CLOCK_NAME)    -setup 0.400
-
-set_clock_uncertainty -from $::env(WBM_CLOCK_NAME)          -to $::env(WBM_CLOCK_NAME)    -hold 0.050
-set_clock_uncertainty -from $::env(WBS_CLOCK_NAME)          -to $::env(WBS_CLOCK_NAME)    -hold 0.050
-
-# TODO set this as parameter
-set_driving_cell -lib_cell $::env(SYNTH_DRIVING_CELL) -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
+###############################################################################
+# Environment
+###############################################################################
+set_driving_cell -lib_cell sky130_fd_sc_hd__inv_8 -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
 set cap_load [expr $::env(SYNTH_CAP_LOAD) / 1000.0]
 puts "\[INFO\]: Setting load to: $cap_load"
 set_load  $cap_load [all_outputs]
 
-## 2 Multi-cycle setup and 0 hold
-set_multicycle_path -setup -from wbm_adr_i* 2
-set_multicycle_path -hold -from wbm_adr_i* 2
+set ::env(SYNTH_TIMING_DERATE) 0.05
+puts "\[INFO\]: Setting timing derate to: [expr {$::env(SYNTH_TIMING_DERATE) * 10}] %"
+set_timing_derate -early [expr {1-$::env(SYNTH_TIMING_DERATE)}]
+set_timing_derate -late [expr {1+$::env(SYNTH_TIMING_DERATE)}]
+###############################################################################
+# Design Rules
+###############################################################################
 
-set_multicycle_path -setup -from wbm_we_i* 2
-set_multicycle_path -hold -from wbm_we_i* 2
+#disable clock gating check at static clock select pins
+set_false_path -through [get_pins u_cpu_ref_sel.u_mux/S]
+set_false_path -through [get_pins u_cpu_clk_sel.u_mux/S]
+set_false_path -through [get_pins u_wbs_clk_sel.u_mux/S]
+set_false_path -through [get_pins u_usb_clk_sel.u_mux/S]

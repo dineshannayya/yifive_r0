@@ -1,105 +1,357 @@
-# SPDX-FileCopyrightText:  2021 , Dinesh Annayya
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
+###############################################################################
+# Created by write_sdc
+# Wed Nov 10 17:01:46 2021
+###############################################################################
+current_design qspim_top
+###############################################################################
+# Timing Constraints
+###############################################################################
+create_clock -name mclk -period 10.0000 [get_ports {mclk}]
+set_propagated_clock [get_clocks {mclk}]
+create_generated_clock -name spiclk -add -source [get_ports {mclk}] -master_clock [get_clocks {mclk}] -divide_by 2 -comment {SPI Clock Out} [get_ports {io_out[0]}]
+
+#Keep in transparent zero delay path
+set_case_analysis 0 [get_ports {cfg_cska_spi[3]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[0]}]
+
+#Keep the Clock Skew in center of the Mux
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[3]}]
+set_case_analysis 1 [get_ports {cfg_cska_sp_co[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[0]}]
+
+set_propagated_clock [get_clocks {spiclk}]
+set_clock_uncertainty -rise_from [get_clocks {mclk}] -rise_to [get_clocks {mclk}]      -hold  0.2500
+set_clock_uncertainty -rise_from [get_clocks {mclk}] -rise_to [get_clocks {mclk}]      -setup 0.2500
+set_clock_uncertainty -rise_from [get_clocks {mclk}] -fall_to [get_clocks {mclk}]      -hold  0.2500
+set_clock_uncertainty -rise_from [get_clocks {mclk}] -fall_to [get_clocks {mclk}]      -setup 0.2500
+set_clock_uncertainty -fall_from [get_clocks {mclk}] -rise_to [get_clocks {mclk}]      -hold  0.2500
+set_clock_uncertainty -fall_from [get_clocks {mclk}] -rise_to [get_clocks {mclk}]      -setup 0.2500
+set_clock_uncertainty -fall_from [get_clocks {mclk}] -fall_to [get_clocks {mclk}]      -hold  0.2500
+set_clock_uncertainty -fall_from [get_clocks {mclk}] -fall_to [get_clocks {mclk}]      -setup 0.2500
+set_clock_uncertainty -rise_from [get_clocks {spiclk}] -rise_to [get_clocks {spiclk}]  -hold  0.2500
+set_clock_uncertainty -rise_from [get_clocks {spiclk}] -rise_to [get_clocks {spiclk}]  -setup 0.2500
+set_clock_uncertainty -rise_from [get_clocks {spiclk}] -fall_to [get_clocks {spiclk}]  -hold  0.2500
+set_clock_uncertainty -rise_from [get_clocks {spiclk}] -fall_to [get_clocks {spiclk}]  -setup 0.2500
+set_clock_uncertainty -fall_from [get_clocks {spiclk}] -rise_to [get_clocks {spiclk}]  -hold  0.2500
+set_clock_uncertainty -fall_from [get_clocks {spiclk}] -rise_to [get_clocks {spiclk}]  -setup 0.2500
+set_clock_uncertainty -fall_from [get_clocks {spiclk}] -fall_to [get_clocks {spiclk}]  -hold  0.2500
+set_clock_uncertainty -fall_from [get_clocks {spiclk}] -fall_to [get_clocks {spiclk}]  -setup 0.2500
+
+set ::env(SYNTH_TIMING_DERATE) 0.05
+puts "\[INFO\]: Setting timing derate to: [expr {$::env(SYNTH_TIMING_DERATE) * 10}] %"
+set_timing_derate -early [expr {1-$::env(SYNTH_TIMING_DERATE)}]
+set_timing_derate -late [expr {1+$::env(SYNTH_TIMING_DERATE)}]
+
+### ClkSkew Adjust
+set_case_analysis 0 [get_ports {cfg_cska_spi[0]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_spi[3]}]
 
 
-set_units -time ns
-set ::env(WB_CLOCK_PERIOD) "10"
-set ::env(WB_CLOCK_PORT) "mclk"
+set_max_delay   3.5 -from [get_ports {wbd_clk_int}]
+set_max_delay   2 -to   [get_ports {wbd_clk_spi}]
+set_max_delay 3.5 -from wbd_clk_int -to wbd_clk_spi
 
-set ::env(SPI_CLOCK_PORT)  "spiclk"
-set ::env(SPI_CLOCK_PERIOD) "20"
+#Static Clock Skew control
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[0]}]
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_sp_co[3]}]
 
-######################################
-# WB Clock domain input output
-######################################
-create_clock [get_ports $::env(WB_CLOCK_PORT)]  -name $::env(WB_CLOCK_PORT)  -period $::env(WB_CLOCK_PERIOD)
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {rst_n}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {rst_n}]
 
-create_generated_clock -name $::env(SPI_CLOCK_PORT) -source [get_ports $::env(WB_CLOCK_PORT)] -master_clock $::env(WB_CLOCK_PORT) -divide_by 2  -add -comment "SPI Clock Out"  [get_port io_out[0]]
+set_input_delay -max 5.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[0]}]
+set_input_delay -max 5.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[1]}]
+set_input_delay -max 5.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[2]}]
+set_input_delay -max 5.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[3]}]
 
-set wb_input_delay_value [expr $::env(WB_CLOCK_PERIOD) * 0.6]
-set wb_output_delay_value [expr $::env(WB_CLOCK_PERIOD) * 0.6]
-puts "\[INFO\]: Setting wb output delay to:$wb_output_delay_value"
-puts "\[INFO\]: Setting wb input delay to: $wb_input_delay_value"
+set_input_delay -min 0.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[0]}]
+set_input_delay -min 0.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[1]}]
+set_input_delay -min 0.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[2]}]
+set_input_delay -min 0.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_in[3]}]
 
+set_output_delay -max 4.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[1]}]
+set_output_delay -max 4.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[2]}]
+set_output_delay -max 4.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[3]}]
+set_output_delay -max 4.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[4]}]
+set_output_delay -max 4.0000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[5]}]
 
-set_input_delay 2.0 -clock [get_clocks $::env(WB_CLOCK_PORT)] {rst_n}
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[1]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[2]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[3]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[4]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_out[5]}]
 
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_stb_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_adr_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_we_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_dat_i*]
-set_input_delay  $wb_input_delay_value   -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_sel_i*]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[0]}]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[1]}]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[2]}]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[3]}]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[4]}]
+set_output_delay -max 4.0000  -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[5]}]
 
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[0]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[1]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[2]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[3]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[4]}]
+set_output_delay -min -0.5000 -clock [get_clocks {spiclk}] -add_delay [get_ports {io_oeb[5]}]
 
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_dat_o*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_ack_o*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port wbd_err_o*]
-set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(WB_CLOCK_PORT)] [get_port spi_debug*]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[0]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[10]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[11]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[12]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[13]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[14]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[15]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[16]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[17]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[18]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[19]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[1]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[20]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[21]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[22]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[23]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[24]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[25]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[26]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[27]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[28]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[29]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[2]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[30]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[31]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[3]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[4]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[5]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[6]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[7]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[8]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[9]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[0]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[10]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[11]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[12]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[13]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[14]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[15]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[16]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[17]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[18]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[19]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[1]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[20]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[21]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[22]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[23]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[24]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[25]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[26]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[27]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[28]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[29]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[2]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[30]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[31]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[3]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[4]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[5]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[6]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[7]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[8]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[9]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[0]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[1]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[2]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[3]}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_stb_i}]
+set_input_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_we_i}]
 
-### SPI I/F constaints
-set spi_input_delay_value  [expr $::env(SPI_CLOCK_PERIOD) * 0.6]
-set spi_output_delay_value [expr $::env(SPI_CLOCK_PERIOD) * 0.6]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[0]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[10]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[11]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[12]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[13]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[14]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[15]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[16]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[17]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[18]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[19]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[1]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[20]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[21]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[22]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[23]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[24]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[25]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[26]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[27]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[28]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[29]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[2]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[30]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[31]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[3]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[4]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[5]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[6]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[7]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[8]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_adr_i[9]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[0]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[10]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[11]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[12]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[13]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[14]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[15]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[16]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[17]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[18]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[19]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[1]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[20]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[21]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[22]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[23]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[24]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[25]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[26]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[27]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[28]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[29]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[2]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[30]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[31]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[3]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[4]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[5]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[6]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[7]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[8]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_i[9]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[0]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[1]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[2]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_sel_i[3]}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_stb_i}]
+set_input_delay -min 3.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_we_i}]
 
-set_input_delay  6   -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[3]]
-set_input_delay  6   -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[2]]
-set_input_delay  6   -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[1]]
-set_input_delay  6   -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[0]]
+set_max_delay  10.0000 -to [get_ports {spi_debug[0]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[10]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[11]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[12]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[13]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[14]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[15]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[16]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[17]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[18]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[19]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[1]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[20]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[21]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[22]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[23]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[24]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[25]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[26]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[27]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[28]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[29]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[2]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[30]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[31]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[3]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[4]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[5]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[6]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[7]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[8]}]
+set_max_delay  10.0000 -to [get_ports {spi_debug[9]}]
 
-set_input_delay  0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[3]]
-set_input_delay  0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[2]]
-set_input_delay  0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[1]]
-set_input_delay  0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_in[0]]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_ack_o}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[0]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[10]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[11]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[12]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[13]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[14]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[15]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[16]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[17]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[18]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[19]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[1]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[20]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[21]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[22]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[23]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[24]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[25]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[26]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[27]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[28]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[29]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[2]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[30]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[31]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[3]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[4]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[5]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[6]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[7]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[8]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[9]}]
+set_output_delay -max 6.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_err_o}]
 
-#io_out[0] is spiclcok
-#set_output_delay $wb_output_delay_value  -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[0]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[5]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[4]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[3]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[2]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[1]]
-
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[5]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[4]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[3]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[2]]
-set_output_delay 6  -max -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[1]]
-
-set_output_delay -0.5   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[5]]
-set_output_delay -0.5   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[4]]
-set_output_delay -0.5   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[3]]
-set_output_delay -0.5   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[2]]
-set_output_delay 0.0    -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[1]]
-
-# Chip select asserted multiple cycle eariler than spi clock
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_out[1]]
-
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[5]]
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[4]]
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[3]]
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[2]]
-set_output_delay 0   -min -clock [get_clocks $::env(SPI_CLOCK_PORT)] [get_port io_oeb[1]]
-
-set_clock_uncertainty -from $::env(SPI_CLOCK_PORT)   -to $::env(SPI_CLOCK_PORT)   -setup 0.800
-set_clock_uncertainty -from $::env(WB_CLOCK_PERIOD)  -to $::env(WB_CLOCK_PERIOD)  -setup 0.800
-set_clock_uncertainty -from $::env(SPI_CLOCK_PORT)   -to $::env(SPI_CLOCK_PORT)   -hold 0.050
-set_clock_uncertainty -from $::env(WB_CLOCK_PERIOD)  -to $::env(WB_CLOCK_PERIOD)  -hold 0.050
-
-# TODO set this as parameter
-set_driving_cell -lib_cell $::env(SYNTH_DRIVING_CELL) -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_ack_o}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[0]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[10]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[11]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[12]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[13]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[14]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[15]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[16]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[17]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[18]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[19]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[1]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[20]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[21]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[22]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[23]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[24]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[25]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[26]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[27]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[28]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[29]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[2]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[30]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[31]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[3]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[4]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[5]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[6]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[7]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[8]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_dat_o[9]}]
+set_output_delay -min 1.0000 -clock [get_clocks {mclk}] -add_delay [get_ports {wbd_err_o}]
+###############################################################################
+# Environment
+###############################################################################
+set_driving_cell -lib_cell sky130_fd_sc_hd__inv_8 -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
 set cap_load [expr $::env(SYNTH_CAP_LOAD) / 1000.0]
 puts "\[INFO\]: Setting load to: $cap_load"
 set_load  $cap_load [all_outputs]
-
+###############################################################################
+# Design Rules
+###############################################################################

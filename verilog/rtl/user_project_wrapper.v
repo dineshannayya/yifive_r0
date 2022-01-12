@@ -27,8 +27,12 @@
 ////      This is digital core and integrate all the main block   ////
 ////      here.  Following block are integrated here              ////
 ////      1. Risc V Core                                          ////
-////      2. SPI Master                                           ////
+////      2. Quad SPI Master                                      ////
 ////      3. Wishbone Cross Bar                                   ////
+////      4. UART                                                 ////
+////      5, USB 1.1                                              ////
+////      6. I2C Master                                           ////
+////      7. SRAM 2KB                                             ////
 ////                                                              ////
 ////  To Do:                                                      ////
 ////    nothing                                                   ////
@@ -99,7 +103,30 @@
 ////          usb1.1 host integrated part of uart_i2cm_usb module,////
 ////          due to number of IO pin limitation,                 ////
 ////          Only UART/I2C/USB selected based on config mode     ////
-////                                                              ////
+////    1.2 - Oct 27, 2021, Dinesh A                              ////
+////          For better power routing, clock skew block are moved////
+////          corresponding destination module like wb_host, spi  ////
+////          sdram                                               ////
+////    1.3   Oct 28, 2021, Dinesh A                              ////
+////          Modification for MPW-3 Shuttle                      ////
+////    1.4   Oct 28, 2021, Dinesh A                              ////
+////          Bug fix: uart_i2c_usb byte_select width changed     ////
+////          from 1 to 4                                         ////
+////    1.5   Nov 12, 2021, Dinesh A                              ////
+////          2KB SRAM Interface added to RISC Core               ////
+////    1.6   Nov 14, 2021, Dinesh A                              ////
+////          Major bug, clock divider inside the wb_host reset   ////
+////          connectivity open is fixed                          ////
+////    1.7   Nov 15, 2021, Dinesh A                              ////
+////           Bug fix in clk_ctrl High/Low counter width         ////
+////           Removed sram_clock                                 ////
+////    1.8   Dec 22, 2021, Dinesh A                              ////
+////          software Reg 1/2/3 added in glbl reg 6/7/8          ////
+////    1.9   Dec 23, 2021, Dinesh A                              ////
+////          8KB SRAM+ MBIST and 4KB TSRAM ADDED                 ////
+////    2.0   Jan 07, 2022, Dinesh A                              ////
+////          1. TCM Bug fix                                      ////
+////          2. Soft Reboot with LA[0]                           ////
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
 //// Copyright (C) 2000 Authors and OPENCORES.ORG                 ////
@@ -177,9 +204,12 @@ module user_project_wrapper (
 // Local Parameter Declaration
 // --------------------------------------------------
 
-parameter      SDR_DW   = 8;  // SDR Data Width 
-parameter      SDR_BW   = 1;  // SDR Byte Width
-parameter      WB_WIDTH = 32; // WB ADDRESS/DARA WIDTH
+parameter  BIST_NO_SRAM  = 4; // NO of MBIST MEMORY
+parameter  BIST1_ADDR_WD = 11; // 512x32 SRAM
+parameter  BIST_DATA_WD  = 32;
+parameter  SDR_DW        = 8;  // SDR Data Width 
+parameter  SDR_BW        = 1;  // SDR Byte Width
+parameter  WB_WIDTH      = 32; // WB ADDRESS/DARA WIDTH
 
 //---------------------------------------------------------------------
 // Wishbone Risc V Instruction Memory Interface
@@ -263,11 +293,24 @@ wire                           wbd_uart_stb_o; // strobe/request
 wire   [7:0]                   wbd_uart_adr_o; // address
 wire                           wbd_uart_we_o;  // write
 wire   [31:0]                  wbd_uart_dat_o; // data output
-wire                           wbd_uart_sel_o; // byte enable
+wire   [3:0]                   wbd_uart_sel_o; // byte enable
 wire                           wbd_uart_cyc_o ;
 wire   [31:0]                  wbd_uart_dat_i; // data input
 wire                           wbd_uart_ack_i; // acknowlegement
 wire                           wbd_uart_err_i;  // error
+
+//---------------------------------------------------------------------
+//  MBIST1  
+//---------------------------------------------------------------------
+wire                           wbd_mbist_stb_o; // strobe/request
+wire   [12:0]                  wbd_mbist_adr_o; // address
+wire                           wbd_mbist_we_o;  // write
+wire   [WB_WIDTH-1:0]          wbd_mbist_dat_o; // data output
+wire   [3:0]                   wbd_mbist_sel_o; // byte enable
+wire                           wbd_mbist_cyc_o ;
+wire   [WB_WIDTH-1:0]          wbd_mbist_dat_i; // data input
+wire                           wbd_mbist_ack_i; // acknowlegement
+wire                           wbd_mbist_err_i;  // error
 
 //----------------------------------------------------
 //  CPU Configuration
@@ -277,26 +320,35 @@ wire                              spi_rst_n     ;
 wire                              sdram_rst_n   ;
 wire                              uart_rst_n    ;// uart reset
 wire                              i2c_rst_n     ;// i2c reset
-wire                              usb_rst_n     ;// i2c reset
+wire                              mbist_rst_n   ;// Mbist Reset
 wire   [1:0]                      uart_i2c_usb_sel  ;// 0 - uart, 1 - I2C, 2- USb
 wire                              sdram_clk           ;
 wire                              cpu_clk       ;
 wire                              rtc_clk       ;
 wire                              usb_clk       ;
 wire                              wbd_clk_int   ;
-//wire                              wbd_clk_int1  ;
-//wire                              wbd_clk_int2  ;
+
+wire                              wbd_clk_spim_rp   ;
+wire                              wbd_clk_sdrc_rp   ;
+wire                              wbd_clk_glbl_rp   ;
+wire                              wbd_clk_uart_rp   ;
+wire                              wbd_clk_riscv_rp  ;
+wire                              wbd_clk_mbist_rp  ;
+
 wire                              wbd_int_rst_n ;
-//wire                              wbd_int1_rst_n ;
-//wire                              wbd_int2_rst_n ;
 
 wire [31:0]                       fuse_mhartid  ;
 wire [15:0]                       irq_lines     ;
 wire                              soft_irq      ;
+wire [31:0]                       fuse_mhartid_rp  ;
+wire [15:0]                       irq_lines_rp ;
+wire                              soft_irq_rp  ;
 
-wire [7:0]                        cfg_glb_ctrl  ;
 wire [31:0]                       cfg_clk_ctrl1 ;
 wire [31:0]                       cfg_clk_ctrl2 ;
+
+wire [3:0]                        cfg_boot_remap; // remaping risc imem to SRAM
+
 wire [3:0]                        cfg_cska_wi   ; // clock skew adjust for wishbone interconnect
 wire [3:0]                        cfg_cska_riscv; // clock skew adjust for riscv
 wire [3:0]                        cfg_cska_uart ; // clock skew adjust for uart
@@ -304,21 +356,35 @@ wire [3:0]                        cfg_cska_spi  ; // clock skew adjust for spi
 wire [3:0]                        cfg_cska_sdram; // clock skew adjust for sdram
 wire [3:0]                        cfg_cska_glbl ; // clock skew adjust for global reg
 wire [3:0]                        cfg_cska_wh   ; // clock skew adjust for web host
-
-
-wire                              wbd_clk_wi    ; // clock for wishbone interconnect
-wire                              wbd_clk_riscv ; // clock for riscv
-wire                              wbd_clk_uart  ; // clock for uart
-wire                              wbd_clk_spi   ; // clock for spi
-wire                              wbd_clk_sdram ; // clock for sdram
-wire                              wbd_clk_glbl  ; // clock for global reg
-wire                              wbd_clk_wh    ; // clock for global reg
+wire [3:0]                        cfg_cska_mbist; // clock skew adjust for MBIST
 
 wire [3:0]                        cfg_cska_sd_co; // clock skew adjust for sdram clock out
 wire [3:0]                        cfg_cska_sd_ci; // clock skew adjust for sdram clock input
 wire [3:0]                        cfg_cska_sp_co; // clock skew adjust for SPI clock out
 
-wire                              io_out_29_    ; // Internally tapped SDRAM clock
+// Config though wb_interconnect repeate
+wire [3:0]                        cfg_cska_riscv_rp; // clock skew adjust for riscv
+wire [3:0]                        cfg_cska_uart_rp ; // clock skew adjust for uart
+wire [3:0]                        cfg_cska_spi_rp  ; // clock skew adjust for spi
+wire [3:0]                        cfg_cska_sdram_rp; // clock skew adjust for sdram
+wire [3:0]                        cfg_cska_glbl_rp ; // clock skew adjust for global reg
+wire [3:0]                        cfg_cska_mbist_rp; // clock skew adjust for MBIST
+
+wire [3:0]                        cfg_cska_sd_co_rp; // clock skew adjust for sdram clock out
+wire [3:0]                        cfg_cska_sd_ci_rp; // clock skew adjust for sdram clock input
+wire [3:0]                        cfg_cska_sp_co_rp; // clock skew adjust for SPI clock out
+
+
+// Clock from skew cells
+wire                              wbd_clk_wi_skew    ; // skew clock for wishbone interconnect
+wire                              wbd_clk_riscv_skew ; // skew clock for riscv
+wire                              wbd_clk_uart_skew  ; // skew clock for uart
+wire                              wbd_clk_spi_skew   ; // skew clock for spi
+wire                              wbd_clk_sdram_skew ; // skew clock for sdram
+wire                              wbd_clk_glbl_skew  ; // skew clock for global reg
+wire                              wbd_clk_wh_skew    ; // skew clock for global reg
+wire                              wbd_clk_mbist_skew ; // skew clock for MBIST
+
 wire                              io_in_29_     ; // Clock Skewed Pad SDRAM clock
 wire                              io_in_30_     ; // SPI clock out
 
@@ -340,11 +406,110 @@ wire [3:0]                        cfg_sdr_twr_d       ; // Write recovery delay
 wire [11: 0]                      cfg_sdr_rfsh        ;
 wire [2 : 0]                      cfg_sdr_rfmax       ;
 
+wire [31:0]                       sdram_debug_rp     ;
 wire [31:0]                       spi_debug           ;
 wire [31:0]                       sdram_debug         ;
 wire [63:0]                       riscv_debug         ;
 
+`ifndef SCR1_TCM_MEM
+// SRAM-0 PORT-0 - DMEM I/F
+wire                             sram0_clk0           ; // CLK
+wire                             sram0_csb0           ; // CS#
+wire                             sram0_web0           ; // WE#
+wire   [8:0]                     sram0_addr0          ; // Address
+wire   [3:0]                     sram0_wmask0         ; // WMASK#
+wire   [31:0]                    sram0_din0           ; // Write Data
+wire   [31:0]                    sram0_dout0          ; // Read Data
 
+// SRAM-0 PORT-1, IMEM I/F
+wire                             sram0_clk1           ; // CLK
+wire                             sram0_csb1           ; // CS#
+wire  [8:0]                      sram0_addr1          ; // Address
+wire  [31:0]                     sram0_dout1          ; // Read Data
+
+// SRAM-1 PORT-0 - DMEM I/F
+wire                             sram1_clk0           ; // CLK
+wire                             sram1_csb0           ; // CS#
+wire                             sram1_web0           ; // WE#
+wire   [8:0]                     sram1_addr0          ; // Address
+wire   [3:0]                     sram1_wmask0         ; // WMASK#
+wire   [31:0]                    sram1_din0           ; // Write Data
+wire   [31:0]                    sram1_dout0          ; // Read Data
+
+// SRAM-1 PORT-1, IMEM I/F
+wire                             sram1_clk1           ; // CLK
+wire                             sram1_csb1           ; // CS#
+wire  [8:0]                      sram1_addr1          ; // Address
+wire  [31:0]                     sram1_dout1          ; // Read Data
+
+
+`endif
+
+//----------------------------------------------------------
+// BIST I/F
+// ---------------------------------------------------------
+wire                             bist_en             ;
+wire                             bist_run            ;
+wire                             bist_load           ;
+
+wire                             bist_sdi            ;
+wire                             bist_shift          ;
+wire                             bist_sdo            ;
+
+wire                             bist_done           ;
+wire [3:0]                       bist_error          ;
+wire [3:0]                       bist_correct        ;
+wire [3:0]                       bist_error_cnt0     ;
+wire [3:0]                       bist_error_cnt1     ;
+wire [3:0]                       bist_error_cnt2     ;
+wire [3:0]                       bist_error_cnt3     ;
+
+// With Repeater Buffer
+wire                             bist_en_rp          ;
+wire                             bist_run_rp         ;
+wire                             bist_load_rp        ;
+
+wire                             bist_sdi_rp         ;
+wire                             bist_shift_rp       ;
+wire                             bist_sdo_rp         ;
+
+wire                             bist_done_rp        ;
+wire [3:0]                       bist_error_rp       ;
+wire [3:0]                       bist_correct_rp     ;
+wire [3:0]                       bist_error_cnt0_rp  ;
+wire [3:0]                       bist_error_cnt1_rp  ;
+wire [3:0]                       bist_error_cnt2_rp  ;
+wire [3:0]                       bist_error_cnt3_rp  ;
+
+// towards memory MBIST1
+// PORT-A
+wire   [BIST_NO_SRAM-1:0]      mem_clk_a;
+wire   [BIST1_ADDR_WD-1:2]     mem0_addr_a;
+wire   [BIST1_ADDR_WD-1:2]     mem1_addr_a;
+wire   [BIST1_ADDR_WD-1:2]     mem2_addr_a;
+wire   [BIST1_ADDR_WD-1:2]     mem3_addr_a;
+wire   [BIST_NO_SRAM-1:0]      mem_cen_a;
+wire   [BIST_NO_SRAM-1:0]      mem_web_a;
+wire [BIST_DATA_WD/8-1:0]      mem0_mask_a;
+wire [BIST_DATA_WD/8-1:0]      mem1_mask_a;
+wire [BIST_DATA_WD/8-1:0]      mem2_mask_a;
+wire [BIST_DATA_WD/8-1:0]      mem3_mask_a;
+wire   [BIST_DATA_WD-1:0]      mem0_din_a;
+wire   [BIST_DATA_WD-1:0]      mem1_din_a;
+wire   [BIST_DATA_WD-1:0]      mem2_din_a;
+wire   [BIST_DATA_WD-1:0]      mem3_din_a;
+wire   [BIST_DATA_WD-1:0]      mem0_dout_a;
+wire   [BIST_DATA_WD-1:0]      mem1_dout_a;
+wire   [BIST_DATA_WD-1:0]      mem2_dout_a;
+wire   [BIST_DATA_WD-1:0]      mem3_dout_a;
+
+// PORT-B
+wire [BIST_NO_SRAM-1:0]        mem_clk_b;
+wire [BIST_NO_SRAM-1:0]        mem_cen_b;
+wire [BIST1_ADDR_WD-1:2]       mem0_addr_b;
+wire [BIST1_ADDR_WD-1:2]       mem1_addr_b;
+wire [BIST1_ADDR_WD-1:2]       mem2_addr_b;
+wire [BIST1_ADDR_WD-1:2]       mem3_addr_b;
 
 /////////////////////////////////////////////////////////
 // Clock Skew Ctrl
@@ -352,11 +517,12 @@ wire [63:0]                       riscv_debug         ;
 
 assign cfg_cska_wi    = cfg_clk_ctrl1[3:0];
 assign cfg_cska_riscv = cfg_clk_ctrl1[7:4];
-assign cfg_cska_uart  = cfg_clk_ctrl1[11:8];
-assign cfg_cska_spi   = cfg_clk_ctrl1[15:12];
-assign cfg_cska_sdram = cfg_clk_ctrl1[19:16];
+assign cfg_cska_spi   = cfg_clk_ctrl1[11:8];
+assign cfg_cska_sdram = cfg_clk_ctrl1[15:12];
+assign cfg_cska_uart  = cfg_clk_ctrl1[19:16];
 assign cfg_cska_glbl  = cfg_clk_ctrl1[23:20];
-assign cfg_cska_wh    = cfg_clk_ctrl1[27:24];
+assign cfg_cska_mbist = cfg_clk_ctrl1[27:24];
+assign cfg_cska_wh    = cfg_clk_ctrl1[31:28];
 
 assign cfg_cska_sd_co = cfg_clk_ctrl2[3:0]; // SDRAM clock out control
 assign cfg_cska_sd_ci = cfg_clk_ctrl2[7:4]; // SDRAM clock in control
@@ -372,6 +538,10 @@ assign la_data_out[127:0]    = {sdram_debug,spi_debug,riscv_debug};
 //clk_buf u_buf2_wbclk    (.clk_i(wbd_clk_int1),.clk_o(wbd_clk_int2));
 
 wb_host u_wb_host(
+`ifdef USE_POWER_PINS
+         .vccd1         (vccd1                 ),// User area 1 1.8V supply
+         .vssd1         (vssd1                 ),// User area 1 digital ground
+`endif
        .user_clock1      (wb_clk_i             ),
        .user_clock2      (user_clock2          ),
 
@@ -386,7 +556,7 @@ wb_host u_wb_host(
        .sdram_rst_n      (sdram_rst_n          ),
        .uart_rst_n       (uart_rst_n           ), // uart reset
        .i2cm_rst_n       (i2c_rst_n            ), // i2c reset
-       .usb_rst_n        (usb_rst_n            ), // usb reset
+       .mbist_rst_n      (mbist_rst_n          ), // usb reset
        .uart_i2c_usb_sel (uart_i2c_usb_sel     ), // 0 - uart, 1 - I2C, 2- USB
 
     // Master Port
@@ -402,8 +572,13 @@ wb_host u_wb_host(
        .wbm_ack_o        (wbs_ack_o            ),  
        .wbm_err_o        (                     ),  
 
+    // Clock Skeq Adjust
+       .wbd_clk_int      (wbd_clk_int          ),
+       .wbd_clk_wh       (wbd_clk_wh           ),  
+       .cfg_cska_wh      (cfg_cska_wh          ),
+
     // Slave Port
-       .wbs_clk_out      (wbd_clk_int          ),  
+       .wbs_clk_out      (wbd_clk_int          ),
        .wbs_clk_i        (wbd_clk_wh           ),  
        .wbs_cyc_o        (wbd_int_cyc_i        ),  
        .wbs_stb_o        (wbd_int_stb_i        ),  
@@ -416,7 +591,10 @@ wb_host u_wb_host(
        .wbs_err_i        (wbd_int_err_o        ),  
 
        .cfg_clk_ctrl1    (cfg_clk_ctrl1        ),
-       .cfg_clk_ctrl2    (cfg_clk_ctrl2        )
+       .cfg_clk_ctrl2    (cfg_clk_ctrl2        ),
+       .cfg_boot_remap   (cfg_boot_remap       ),
+
+       .la_data_in       (la_data_in[0]        )
 
     );
 
@@ -427,6 +605,14 @@ wb_host u_wb_host(
 // RISC V Core instance
 //------------------------------------------------------------------------------
 scr1_top_wb u_riscv_top (
+`ifdef USE_POWER_PINS
+    .vccd1                 (vccd1                    ),// User area 1 1.8V supply
+    .vssd1                 (vssd1                    ),// User area 1 digital ground
+`endif
+    .wbd_clk_int           (wbd_clk_riscv_rp          ), 
+    .cfg_cska_riscv        (cfg_cska_riscv_rp         ), 
+    .wbd_clk_riscv         (wbd_clk_riscv             ),
+
     // Reset
     .pwrup_rst_n            (wbd_int_rst_n             ),
     .rst_n                  (wbd_int_rst_n             ),
@@ -438,16 +624,48 @@ scr1_top_wb u_riscv_top (
     .rtc_clk                (rtc_clk                   ),
 
     // Fuses
-    .fuse_mhartid           (fuse_mhartid              ),
+    .fuse_mhartid           (fuse_mhartid_rp           ),
 
     // IRQ
-    .irq_lines              (irq_lines                 ), 
-    .soft_irq               (soft_irq                  ), // TODO - Interrupts
+    .irq_lines              (irq_lines_rp              ), 
+    .soft_irq               (soft_irq_rp               ), // TODO - Interrupts
 
     // DFT
     // .test_mode           (1'b0                      ), // Moved inside IP
     // .test_rst_n          (1'b1                      ), // Moved inside IP
 
+`ifndef SCR1_TCM_MEM
+    // SRAM-0 PORT-0
+    .sram0_clk0             (sram0_clk0                ),
+    .sram0_csb0             (sram0_csb0                ),
+    .sram0_web0             (sram0_web0                ),
+    .sram0_addr0            (sram0_addr0               ),
+    .sram0_wmask0           (sram0_wmask0              ),
+    .sram0_din0             (sram0_din0                ),
+    .sram0_dout0            (sram0_dout0               ),
+    
+    // SRAM-0 PORT-0
+    .sram0_clk1             (sram0_clk1                ),
+    .sram0_csb1             (sram0_csb1                ),
+    .sram0_addr1            (sram0_addr1               ),
+    .sram0_dout1            (sram0_dout1               ),
+
+    // SRAM-1 PORT-0
+    .sram1_clk0             (sram1_clk0                ),
+    .sram1_csb0             (sram1_csb0                ),
+    .sram1_web0             (sram1_web0                ),
+    .sram1_addr0            (sram1_addr0               ),
+    .sram1_wmask0           (sram1_wmask0              ),
+    .sram1_din0             (sram1_din0                ),
+    .sram1_dout0            (sram1_dout0               ),
+    
+    // SRAM PORT-0
+    .sram1_clk1             (sram1_clk1                ),
+    .sram1_csb1             (sram1_csb1                ),
+    .sram1_addr1            (sram1_addr1               ),
+    .sram1_dout1            (sram1_dout1               ),
+
+`endif
     
     .wb_rst_n               (wbd_int_rst_n             ),
     .wb_clk                 (wbd_clk_riscv             ),
@@ -472,6 +690,50 @@ scr1_top_wb u_riscv_top (
     .wbd_dmem_err_i         (wbd_riscv_dmem_err_o      ) 
 );
 
+`ifndef SCR1_TCM_MEM
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_tsram0_2kb(
+`ifdef USE_POWER_PINS
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
+`endif
+// Port 0: RW
+    .clk0     (sram0_clk0),
+    .csb0     (sram0_csb0),
+    .web0     (sram0_web0),
+    .wmask0   (sram0_wmask0),
+    .addr0    (sram0_addr0),
+    .din0     (sram0_din0),
+    .dout0    (sram0_dout0),
+// Port 1: R
+    .clk1     (sram0_clk1),
+    .csb1     (sram0_csb1),
+    .addr1    (sram0_addr1),
+    .dout1    (sram0_dout1)
+  );
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_tsram1_2kb(
+`ifdef USE_POWER_PINS
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
+`endif
+// Port 0: RW
+    .clk0     (sram1_clk0),
+    .csb0     (sram1_csb0),
+    .web0     (sram1_web0),
+    .wmask0   (sram1_wmask0),
+    .addr0    (sram1_addr0),
+    .din0     (sram1_din0),
+    .dout0    (sram1_dout0),
+// Port 1: R
+    .clk1     (sram1_clk1),
+    .csb1     (sram1_csb1),
+    .addr1    (sram1_addr1),
+    .dout1    (sram1_dout1)
+  );
+`endif
+
+
 /*********************************************************
 * SPI Master
 * This is an implementation of an SPI master that is controlled via an AXI bus. 
@@ -486,8 +748,18 @@ spim_top
 `endif
 ) u_spi_master
 (
-    .mclk                   (wbd_clk_spi               ),
+`ifdef USE_POWER_PINS
+         .vccd1         (vccd1                 ),// User area 1 1.8V supply
+         .vssd1         (vssd1                 ),// User area 1 digital ground
+`endif
+    .mclk                   (wbd_clk_spi_skew          ),
     .rst_n                  (spi_rst_n                 ),
+
+    // Clock Skew Adjust
+    .cfg_cska_sp_co         (cfg_cska_sp_co_rp         ),
+    .cfg_cska_spi           (cfg_cska_spi_rp           ),
+    .wbd_clk_int            (wbd_clk_spim_rp           ),
+    .wbd_clk_spi            (wbd_clk_spi_skew          ),
 
     .wbd_stb_i              (wbd_spim_stb_o            ),
     .wbd_adr_i              (wbd_spim_adr_o            ),
@@ -502,7 +774,7 @@ spim_top
 
     // Pad Interface
     .io_in                  (io_in[35:32]              ), // io_in[31:30] unused ports
-    .io_out                 ({io_out[35:31],io_in_30_} ),
+    .io_out                 (io_out[35:30]             ),
     .io_oeb                 (io_oeb[35:30]             )
 
 );
@@ -517,13 +789,25 @@ sdrc_top
 	    .SDR_BW(1))
       `endif
      u_sdram_ctrl (
+`ifdef USE_POWER_PINS
+     .vccd1                  (vccd1                     ),// User area 1 1.8V supply
+     .vssd1                  (vssd1                     ),// User area 1 digital ground
+`endif
+     .wbd_clk_int            (wbd_clk_sdrc_rp           ),
+     .cfg_cska_sdram         (cfg_cska_sdram_rp         ),
+     .wbd_clk_sdram          (wbd_clk_sdram_skew        ),
+
+     .cfg_cska_sd_co         (cfg_cska_sd_co_rp         ),
+     .cfg_cska_sd_ci         (cfg_cska_sd_ci_rp         ),
+
+
     .cfg_sdr_width          (cfg_sdr_width              ),
     .cfg_colbits            (cfg_colbits                ),
     .sdram_debug            (sdram_debug                ),
                     
     // WB bus
     .wb_rst_n               (wbd_int_rst_n              ),
-    .wb_clk_i               (wbd_clk_sdram              ),
+    .wb_clk_i               (wbd_clk_sdram_skew         ),
     
     .wb_stb_i               (wbd_sdram_stb_o            ),
     .wb_addr_i              (wbd_sdram_adr_o            ),
@@ -540,9 +824,9 @@ sdrc_top
     .sdram_resetn           (sdram_rst_n               ),
 
     /** Pad Interface       **/
-    .io_in                  ({io_in_29_,io_in[28:0]}   ),
+    .io_in                  (io_in[29:0]               ),
     .io_oeb                 (io_oeb[29:0]              ),
-    .io_out                 ({io_out_29_,io_out[28:0]} ),
+    .io_out                 (io_out[29:0]              ),
                     
     /* Parameters */
     .sdr_init_done          (sdr_init_done             ),
@@ -560,8 +844,121 @@ sdrc_top
    );
 
 
-wb_interconnect  u_intercon (
-         .clk_i         (wbd_clk_wi            ), 
+wb_interconnect  
+          #(
+	`ifndef SYNTHESIS
+	        .CH_CLK_WD(6),
+	        .CH_DATA_WD(116)
+        `endif
+	   )
+       u_intercon (
+`ifdef USE_POWER_PINS
+         .vccd1         (vccd1                 ),// User area 1 1.8V supply
+         .vssd1         (vssd1                 ),// User area 1 digital ground
+`endif
+     // Clock Skew adjust
+	 .wbd_clk_int   (wbd_clk_int           ), 
+	 .cfg_cska_wi   (cfg_cska_wi           ), 
+	 .wbd_clk_wi    (wbd_clk_wi_skew       ),
+
+	 .boot_remap    (cfg_boot_remap        ),
+
+	 // Feed Through Signals
+	 .ch_clk_in     ({
+	                  wbd_clk_int,
+	                  wbd_clk_int,
+	                  wbd_clk_int,
+                          wbd_clk_int, 
+                          wbd_clk_int, 
+                          wbd_clk_int}),
+	 .ch_clk_out    ({
+                         wbd_clk_mbist_rp,  
+                         wbd_clk_glbl_rp,  
+                         wbd_clk_uart_rp,
+                         wbd_clk_sdrc_rp,  
+                         wbd_clk_spim_rp,  
+                         wbd_clk_riscv_rp
+		         }),
+	 .ch_data_in    ({
+	                 bist_error_cnt3[3:0],
+			 bist_correct[3],
+			 bist_error[3],
+
+	                 bist_error_cnt2[3:0],
+			 bist_correct[2],
+			 bist_error[2],
+
+	                 bist_error_cnt1[3:0],
+			 bist_correct[1],
+			 bist_error[1],
+
+	                 bist_error_cnt0[3:0],
+			 bist_correct[0],
+			 bist_error[0],
+			 bist_done,
+			 bist_sdo,
+			 bist_shift,
+			 bist_sdi,
+			 bist_load,
+			 bist_run,
+			 bist_en,
+
+			 soft_irq,
+			 irq_lines[15:0],
+			 fuse_mhartid[31:0],
+
+			 cfg_cska_sp_co[3:0],
+			 cfg_cska_sd_ci[3:0],
+			 cfg_cska_sd_co[3:0],
+
+		         cfg_cska_mbist[3:0],
+		         cfg_cska_glbl[3:0],
+			 cfg_cska_uart[3:0],
+		         cfg_cska_sdram[3:0],
+		         cfg_cska_spi[3:0],
+                         cfg_cska_riscv[3:0]
+			 } ),
+	 .ch_data_out   ({
+	                 bist_error_cnt3_rp[3:0],
+			 bist_correct_rp[3],
+			 bist_error_rp[3],
+
+	                 bist_error_cnt2_rp[3:0],
+			 bist_correct_rp[2],
+			 bist_error_rp[2],
+
+	                 bist_error_cnt1_rp[3:0],
+			 bist_correct_rp[1],
+			 bist_error_rp[1],
+
+	                 bist_error_cnt0_rp[3:0],
+			 bist_correct_rp[0],
+			 bist_error_rp[0],
+			 bist_done_rp,
+			 bist_sdo_rp,
+			 bist_shift_rp,
+			 bist_sdi_rp,
+			 bist_load_rp,
+			 bist_run_rp,
+			 bist_en_rp,
+
+			 soft_irq_rp,
+			 irq_lines_rp[15:0],
+			 fuse_mhartid_rp[31:0],
+
+			 cfg_cska_sp_co_rp[3:0],
+			 cfg_cska_sd_ci_rp[3:0],
+			 cfg_cska_sd_co_rp[3:0],
+
+		         cfg_cska_mbist_rp[3:0],
+		         cfg_cska_glbl_rp[3:0],
+			 cfg_cska_uart_rp[3:0],
+		         cfg_cska_sdram_rp[3:0],
+		         cfg_cska_spi_rp[3:0],
+                         cfg_cska_riscv_rp[3:0]
+                         }),
+
+         .clk_i         (wbd_clk_wi_skew       ), 
          .rst_n         (wbd_int_rst_n         ),
 
          // Master 0 Interface
@@ -640,12 +1037,31 @@ wb_interconnect  u_intercon (
          .s3_wbd_sel_o  (wbd_uart_sel_o ),
          .s3_wbd_we_o   (wbd_uart_we_o  ),  
          .s3_wbd_cyc_o  (wbd_uart_cyc_o ),
-         .s3_wbd_stb_o  (wbd_uart_stb_o )
+         .s3_wbd_stb_o  (wbd_uart_stb_o ),
+
+         // Slave 4 Interface
+         // .s4_wbd_err_i  (1'b0          ), - Moved inside IP
+         .s4_wbd_dat_i  (wbd_mbist_dat_i ),
+         .s4_wbd_ack_i  (wbd_mbist_ack_i ),
+         .s4_wbd_dat_o  (wbd_mbist_dat_o ),
+         .s4_wbd_adr_o  (wbd_mbist_adr_o ),
+         .s4_wbd_sel_o  (wbd_mbist_sel_o ),
+         .s4_wbd_we_o   (wbd_mbist_we_o  ),  
+         .s4_wbd_cyc_o  (wbd_mbist_cyc_o ),
+         .s4_wbd_stb_o  (wbd_mbist_stb_o )
+
 	);
 
 glbl_cfg   u_glbl_cfg (
+`ifdef USE_POWER_PINS
+       .vccd1                  (vccd1                     ),// User area 1 1.8V supply
+       .vssd1                  (vssd1                     ),// User area 1 digital ground
+`endif
+       .wbd_clk_int            (wbd_clk_glbl_rp           ), 
+       .cfg_cska_glbl          (cfg_cska_glbl_rp          ), 
+       .wbd_clk_glbl           (wbd_clk_glbl_skew         ), 
 
-       .mclk                   (wbd_clk_glbl              ),
+       .mclk                   (wbd_clk_glbl_skew         ),
        .reset_n                (wbd_int_rst_n             ),
 
         // Reg Bus Interface Signal
@@ -681,17 +1097,42 @@ glbl_cfg   u_glbl_cfg (
        .cfg_sdr_trcar_d        (cfg_sdr_trcar_d           ),
        .cfg_sdr_twr_d          (cfg_sdr_twr_d             ),
        .cfg_sdr_rfsh           (cfg_sdr_rfsh              ),
-       .cfg_sdr_rfmax          (cfg_sdr_rfmax             )
+       .cfg_sdr_rfmax          (cfg_sdr_rfmax             ),
+
+       // BIST I/F
+        .bist_en                (bist_en                   ),
+        .bist_run               (bist_run                  ),
+        .bist_load              (bist_load                 ),
+        
+        .bist_sdi               (bist_sdi                  ),
+        .bist_shift             (bist_shift                ),
+        .bist_sdo               (bist_sdo_rp               ),
+        
+        .bist_done              (bist_done_rp              ),
+        .bist_error             (bist_error_rp             ),
+        .bist_correct           (bist_correct_rp           ),
+        .bist_error_cnt0        (bist_error_cnt0_rp        ),
+        .bist_error_cnt1        (bist_error_cnt1_rp        ),
+        .bist_error_cnt2        (bist_error_cnt2_rp        ),
+        .bist_error_cnt3        (bist_error_cnt3_rp        )
 
 
         );
 
 uart_i2c_usb_top   u_uart_i2c_usb (
+`ifdef USE_POWER_PINS
+         .vccd1                 (vccd1                    ),// User area 1 1.8V supply
+         .vssd1                 (vssd1                    ),// User area 1 digital ground
+`endif
+	.wbd_clk_int            (wbd_clk_uart_rp          ), 
+	.cfg_cska_uart          (cfg_cska_uart_rp         ), 
+	.wbd_clk_uart           (wbd_clk_uart_skew        ),
+
         .uart_rstn              (uart_rst_n               ), // uart reset
         .i2c_rstn               (i2c_rst_n                ), // i2c reset
-        .usb_rstn               (usb_rst_n                ), // i2c reset
+        .usb_rstn               (i2c_rst_n                ), // i2c reset
 	.uart_i2c_usb_sel       (uart_i2c_usb_sel         ), // 0 - uart, 1 - I2C
-        .app_clk                (wbd_clk_uart             ),
+        .app_clk                (wbd_clk_uart_skew        ),
 	.usb_clk                (usb_clk                  ),
 
         // Reg Bus Interface Signal
@@ -712,128 +1153,176 @@ uart_i2c_usb_top   u_uart_i2c_usb (
 
      );
 
-////////////////////////////////////////////////////////////////
-// Clock Skew adjust module
-// ///////////////////////////////////////////////////////////
+//------------- MBIST1 - 512x32             ----
 
-// Wishbone interconnect clock skew control
-clk_skew_adjust u_skew_wi
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int                 ), 
-	       .sel        (cfg_cska_wi                 ), 
-	       .clk_out    (wbd_clk_wi                  ) 
-       );
+mbist_top  #(
+	`ifndef SYNTHESIS
+	.BIST_NO_SRAM           (4                      ),
+	.BIST_ADDR_WD           (BIST1_ADDR_WD-2        ),
+	.BIST_DATA_WD           (BIST_DATA_WD           ),
+	.BIST_ADDR_START        (9'h000                 ),
+	.BIST_ADDR_END          (9'h1FB                 ),
+	.BIST_REPAIR_ADDR_START (9'h1FC                 ),
+	.BIST_RAD_WD_I          (BIST1_ADDR_WD-2        ),
+	.BIST_RAD_WD_O          (BIST1_ADDR_WD-2        )
+        `endif
+     ) 
+	     u_mbist (
 
-// riscv clock skew control
-clk_skew_adjust u_skew_riscv
-       (
 `ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
+       .vccd1                  (vccd1                     ),// User area 1 1.8V supply
+       .vssd1                  (vssd1                     ),// User area 1 digital ground
 `endif
-	       .clk_in     (wbd_clk_int                 ), 
-	       .sel        (cfg_cska_riscv              ), 
-	       .clk_out    (wbd_clk_riscv               ) 
-       );
 
-// uart clock skew control
-clk_skew_adjust u_skew_uart
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int                 ), 
-	       .sel        (cfg_cska_uart               ), 
-	       .clk_out    (wbd_clk_uart                ) 
-       );
+     // Clock Skew adjust
+	.wbd_clk_int          (wbd_clk_mbist_rp     ), 
+	.cfg_cska_mbist       (cfg_cska_mbist_rp    ), 
+	.wbd_clk_mbist        (wbd_clk_mbist_skew   ),
 
-// spi clock skew control
-clk_skew_adjust u_skew_spi
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int                ), 
-	       .sel        (cfg_cska_spi               ), 
-	       .clk_out    (wbd_clk_spi                ) 
-       );
+	// WB I/F
+        .wb_clk2_i            (wbd_clk_mbist_skew  ),  
+        .wb_clk_i             (wbd_clk_mbist_skew  ),  
+        .wb_cyc_i             (wbd_mbist_cyc_o),  
+        .wb_stb_i             (wbd_mbist_stb_o),  
+	.wb_cs_i              (wbd_mbist_adr_o[12:11]),
+        .wb_adr_i             (wbd_mbist_adr_o[BIST1_ADDR_WD-1:2]),  
+        .wb_we_i              (wbd_mbist_we_o ),  
+        .wb_dat_i             (wbd_mbist_dat_o),  
+        .wb_sel_i             (wbd_mbist_sel_o),  
+        .wb_dat_o             (wbd_mbist_dat_i),  
+        .wb_ack_o             (wbd_mbist_ack_i),  
+        .wb_err_o             (                 ), 
 
-// sdram clock skew control
-clk_skew_adjust u_skew_sdram
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int                ), 
-	       .sel        (cfg_cska_sdram             ), 
-	       .clk_out    (wbd_clk_sdram              ) 
-       );
+	.rst_n                (mbist_rst_n      ),
 
-// global clock skew control
-clk_skew_adjust u_skew_glbl
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int               ), 
-	       .sel        (cfg_cska_glbl             ), 
-	       .clk_out    (wbd_clk_glbl              ) 
-       );
+	
+	.bist_en              (bist_en_rp       ),
+	.bist_run             (bist_run_rp      ),
+	.bist_shift           (bist_shift_rp    ),
+	.bist_load            (bist_load_rp     ),
+	.bist_sdi             (bist_sdi_rp      ),
 
-// wb_host clock skew control
-clk_skew_adjust u_skew_wh
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (wbd_clk_int               ), 
-	       .sel        (cfg_cska_wh               ), 
-	       .clk_out    (wbd_clk_wh                ) 
-       );
+	.bist_error_cnt3      (bist_error_cnt3  ),
+	.bist_error_cnt2      (bist_error_cnt2  ),
+	.bist_error_cnt1      (bist_error_cnt1  ),
+	.bist_error_cnt0      (bist_error_cnt0  ),
+	.bist_correct         (bist_correct     ),
+	.bist_error           (bist_error       ),
+	.bist_done            (bist_done        ),
+	.bist_sdo             (bist_sdo         ),
 
-// SDRAM clock out clock skew control
-clk_skew_adjust u_skew_sd_co
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (sdram_clk                 ), 
-	       .sel        (cfg_cska_sd_co            ), 
-	       .clk_out    (io_out[29]                ) 
-       );
+     // towards memory
+     // PORT-A
+        .mem_clk_a            (mem_clk_a         ),
+        .mem_addr_a0          (mem0_addr_a       ),
+        .mem_addr_a1          (mem1_addr_a       ),
+        .mem_addr_a2          (mem2_addr_a       ),
+        .mem_addr_a3          (mem3_addr_a       ),
+        .mem_cen_a            (mem_cen_a         ),
+        .mem_web_a            (mem_web_a         ),
+        .mem_mask_a0          (mem0_mask_a       ),
+        .mem_mask_a1          (mem1_mask_a       ),
+        .mem_mask_a2          (mem2_mask_a       ),
+        .mem_mask_a3          (mem3_mask_a       ),
+        .mem_din_a0           (mem0_din_a        ),
+        .mem_din_a1           (mem1_din_a        ),
+        .mem_din_a2           (mem2_din_a        ),
+        .mem_din_a3           (mem3_din_a        ),
+        .mem_dout_a0          (mem0_dout_a       ),
+        .mem_dout_a1          (mem1_dout_a       ),
+        .mem_dout_a2          (mem2_dout_a       ),
+        .mem_dout_a3          (mem3_dout_a       ),
+     // PORT-B
+        .mem_clk_b            (mem_clk_b         ),
+        .mem_cen_b            (mem_cen_b         ),
+        .mem_addr_b0          (mem0_addr_b       ),
+        .mem_addr_b1          (mem1_addr_b       ),
+        .mem_addr_b2          (mem2_addr_b       ),
+        .mem_addr_b3          (mem3_addr_b       )
 
-// Clock Skey for PAD SDRAM clock
-clk_skew_adjust u_skew_sd_ci
-       (
-`ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
-`endif
-	       .clk_in     (io_in[29]                 ), 
-	       .sel        (cfg_cska_sd_ci            ), 
-	       .clk_out    (io_in_29_                 ) 
-       );
 
-// Clock Skey for SPI clock out
-clk_skew_adjust u_skew_sp_co
-       (
+);
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_sram0_2kb(
 `ifdef USE_POWER_PINS
-               .vccd1      (vccd1                      ),// User area 1 1.8V supply
-               .vssd1      (vssd1                      ),// User area 1 digital ground
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
 `endif
-	       .clk_in     (io_in_30_                 ), 
-	       .sel        (cfg_cska_sp_co            ), 
-	       .clk_out    (io_out[30]                ) 
-       );
+// Port 0: RW
+    .clk0     (mem_clk_a[0]),
+    .csb0     (mem_cen_a[0]),
+    .web0     (mem_web_a[0]),
+    .wmask0   (mem0_mask_a),
+    .addr0    (mem0_addr_a),
+    .din0     (mem0_din_a),
+    .dout0    (mem0_dout_a),
+// Port 1: R
+    .clk1     (mem_clk_b[0]),
+    .csb1     (mem_cen_b[0]),
+    .addr1    (mem0_addr_b),
+    .dout1    ()
+  );
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_sram1_2kb(
+`ifdef USE_POWER_PINS
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
+`endif
+// Port 0: RW
+    .clk0     (mem_clk_a[1]),
+    .csb0     (mem_cen_a[1]),
+    .web0     (mem_web_a[1]),
+    .wmask0   (mem1_mask_a),
+    .addr0    (mem1_addr_a),
+    .din0     (mem1_din_a),
+    .dout0    (mem1_dout_a),
+// Port 1: R
+    .clk1     (mem_clk_b[1]),
+    .csb1     (mem_cen_b[1]),
+    .addr1    (mem1_addr_b),
+    .dout1    ()
+  );
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_sram2_2kb(
+`ifdef USE_POWER_PINS
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
+`endif
+// Port 0: RW
+    .clk0     (mem_clk_a[2]),
+    .csb0     (mem_cen_a[2]),
+    .web0     (mem_web_a[2]),
+    .wmask0   (mem2_mask_a),
+    .addr0    (mem2_addr_a),
+    .din0     (mem2_din_a),
+    .dout0    (mem2_dout_a),
+// Port 1: R
+    .clk1     (mem_clk_b[2]),
+    .csb1     (mem_cen_b[2]),
+    .addr1    (mem2_addr_b),
+    .dout1    ()
+  );
+
+
+sky130_sram_2kbyte_1rw1r_32x512_8 u_sram3_2kb(
+`ifdef USE_POWER_PINS
+    .vccd1 (vccd1),// User area 1 1.8V supply
+    .vssd1 (vssd1),// User area 1 digital ground
+`endif
+// Port 0: RW
+    .clk0     (mem_clk_a[3]),
+    .csb0     (mem_cen_a[3]),
+    .web0     (mem_web_a[3]),
+    .wmask0   (mem3_mask_a),
+    .addr0    (mem3_addr_a),
+    .din0     (mem3_din_a),
+    .dout0    (mem3_dout_a),
+// Port 1: R
+    .clk1     (mem_clk_b[3]),
+    .csb1     (mem_cen_b[3]),
+    .addr1    (mem3_addr_b),
+    .dout1    ()
+  );
+
 
 endmodule : user_project_wrapper

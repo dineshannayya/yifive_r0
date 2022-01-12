@@ -113,12 +113,34 @@ module usb1_host (
     logic                  reg_ack;
 
 
+//###################################
+// WishBone Reset Synchronization
+//###################################
+logic wbm_srst_n;
+reset_sync  u_wb_rst (
+	      .scan_mode  (1'b0           ),
+              .dclk       (wbm_clk_i      ), // Destination clock domain
+	      .arst_n     (wbm_rst_n      ), // active low async reset
+              .srst_n     (wbm_srst_n    )
+          );
+
+//###################################
+// Line Reset Synchronization
+//###################################
+logic usb_srstn_n;
+reset_sync  u_usb_rst (
+	      .scan_mode  (1'b0           ),
+              .dclk       (usb_clk_i      ), // Destination clock domain
+	      .arst_n     (usb_rstn_i     ), // active low async reset
+              .srst_n     (usb_srstn_n    )
+          );
+
 
 async_wb  #(.AW (6))
      u_async_wb(
 
     // Master Port
-       .wbm_rst_n        (wbm_rst_n            ),  // Regular Reset signal
+       .wbm_rst_n        (wbm_srst_n           ),  // Regular Reset signal
        .wbm_clk_i        (wbm_clk_i            ),  // System clock
        .wbm_cyc_i        (wbm_stb_i            ),  // strobe/request
        .wbm_stb_i        (wbm_stb_i            ),  // strobe/request
@@ -131,7 +153,7 @@ async_wb  #(.AW (6))
        .wbm_err_o        (wbm_err_o            ),  // error
 
     // Slave Port
-       .wbs_rst_n        (usb_rstn_i           ),  // Regular Reset signal
+       .wbs_rst_n        (usb_srstn_n          ),  // Regular Reset signal
        .wbs_clk_i        (usb_clk_i            ),  // System clock
        .wbs_cyc_o        (                     ),  // strobe/request
        .wbs_stb_o        (reg_cs               ),  // strobe/request
@@ -148,7 +170,7 @@ async_wb  #(.AW (6))
 usbh_core  u_core (
     // Inputs
     .clk_i               (usb_clk_i           ),
-    .rstn_i              (usb_rstn_i          ),
+    .rstn_i              (usb_srstn_n         ),
 
     .reg_cs              (reg_cs              ),
     .reg_wr              (reg_wr              ),
@@ -185,7 +207,7 @@ usbh_core  u_core (
 usb_fs_phy  u_phy(
     // Inputs
          .clk_i               (usb_clk_i           ),
-         .rstn_i              (usb_rstn_i          ),
+         .rstn_i              (usb_srstn_n         ),
          .utmi_data_out_i     (utmi_data_out_o     ),
          .utmi_txvalid_i      (utmi_txvalid_o      ),
          .utmi_op_mode_i      (utmi_op_mode_o      ),

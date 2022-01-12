@@ -31,11 +31,18 @@ set ::env(CLOCK_PORT) "mclk"
 
 set ::env(SYNTH_MAX_FANOUT) 4
 
+## CTS BUFFER
+set ::env(CTS_CLK_BUFFER_LIST) "sky130_fd_sc_hd__clkbuf_4 sky130_fd_sc_hd__clkbuf_8"
+set ::env(CTS_SINK_CLUSTERING_SIZE) "16"
+set ::env(CLOCK_BUFFER_FANOUT) "8"
+
 # Sources
 # -------
 
 # Local sources + no2usb sources
 set ::env(VERILOG_FILES) "\
+        $script_dir/../../verilog/rtl/clk_skew_adjust/src/clk_skew_adjust.gv \
+        $script_dir/../../verilog/rtl/lib/reset_sync.sv      \
         $script_dir/../../verilog/rtl/spi_master/src/spim_top.sv \
         $script_dir/../../verilog/rtl/spi_master/src/spim_if.sv \
         $script_dir/../../verilog/rtl/spi_master/src/spim_regs.sv \
@@ -43,8 +50,11 @@ set ::env(VERILOG_FILES) "\
         $script_dir/../../verilog/rtl/spi_master/src/spim_clkgen.sv \
         $script_dir/../../verilog/rtl/spi_master/src/spim_ctrl.sv \
         $script_dir/../../verilog/rtl/spi_master/src/spim_rx.sv \
-        $script_dir/../../verilog/rtl/spi_master/src/spim_tx.sv "
+        $script_dir/../../verilog/rtl/spi_master/src/spim_tx.sv \
+        $script_dir/../../verilog/rtl/lib/ctech_cells.sv \
+        "
 
+set ::env(SYNTH_DEFINES) [list SYNTHESIS ]
 set ::env(SYNTH_READ_BLACKBOX_LIB) 1
 set ::env(SDC_FILE) "$script_dir/base.sdc"
 set ::env(BASE_SDC_FILE) "$script_dir/base.sdc"
@@ -61,19 +71,16 @@ set ::env(GND_PIN) [list {vssd1}]
 set ::env(FP_PIN_ORDER_CFG) $::env(DESIGN_DIR)/pin_order.cfg
 
 set ::env(FP_SIZING) absolute
-set ::env(DIE_AREA) "0 0 400 650"
+set ::env(DIE_AREA) "0 0 400 550"
 
 set ::env(PL_TIME_DRIVEN) 1
-set ::env(PL_TARGET_DENSITY) "0.45"
-
+set ::env(PL_TARGET_DENSITY) "0.40"
 
 # If you're going to use multiple power domains, then keep this disabled.
 set ::env(RUN_CVC) 0
 
 #set ::env(PDN_CFG) $script_dir/pdn.tcl
 
-
-set ::env(PL_ROUTABILITY_DRIVEN) 1
 
 # helps in anteena fix
 set ::env(USE_ARC_ANTENNA_CHECK) "0"
@@ -86,7 +93,12 @@ set ::env(FP_PDN_HPITCH) 100
 set ::env(FP_PDN_VWIDTH) 5
 set ::env(FP_PDN_HWIDTH) 5
 
-set ::env(GLB_RT_MAXLAYER) 4
+set ::env(GLB_RT_MAXLAYER) 5
 set ::env(GLB_RT_MAX_DIODE_INS_ITERS) 10
-set ::env(DIODE_INSERTION_STRATEGY) 5
+set ::env(DIODE_INSERTION_STRATEGY) 4
 
+
+set ::env(QUIT_ON_TIMING_VIOLATIONS) "0"
+set ::env(QUIT_ON_MAGIC_DRC) "1"
+set ::env(QUIT_ON_LVS_ERROR) "0"
+set ::env(QUIT_ON_SLEW_VIOLATIONS) "0"

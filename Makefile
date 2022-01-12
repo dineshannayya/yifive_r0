@@ -15,8 +15,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 CARAVEL_ROOT?=$(PWD)/caravel
-PRECHECK_ROOT?=${HOME}/open_mpw_precheck
+PRECHECK_ROOT?=${HOME}/mpw_precheck
 SIM ?= RTL
+DUMP ?= OFF
 
 # Install lite version of caravel, (1): caravel-lite, (0): caravel
 CARAVEL_LITE?=1
@@ -34,10 +35,23 @@ endif
 # Install caravel as submodule, (1): submodule, (0): clone
 SUBMODULE?=1
 
+#RISCV COMPLIANCE test Environment
+COREMARK_DIR   = verilog/rtl/syntacore/scr1/dependencies/coremark
+RISCV_COMP_DIR = verilog/rtl/syntacore/scr1/dependencies/riscv-compliance
+RISCV_TEST_DIR = verilog/rtl/syntacore/scr1/dependencies/riscv-tests
+
+COREMARK_REPO   =  https://github.com/eembc/coremark
+RISCV_COMP_REPO =  https://github.com/riscv/riscv-compliance
+RISCV_TEST_REPO =  https://github.com/riscv/riscv-tests
+
+COREMARK_BRANCH   =  7f420b6bdbff436810ef75381059944e2b0d79e8
+RISCV_COMP_BRANCH =  d51259b2a949be3af02e776c39e135402675ac9b
+RISCV_TEST_BRANCH =  e30978a71921159aec38eeefd848fca4ed39a826
+
 # Include Caravel Makefile Targets
-.PHONY: %
+.PHONY: % : check-caravel
 %: 
-	$(MAKE) -f $(CARAVEL_ROOT)/Makefile $@
+	export CARAVEL_ROOT=$(CARAVEL_ROOT) && $(MAKE) -f $(CARAVEL_ROOT)/Makefile $@
 
 # Verify Target for running simulations
 .PHONY: verify
@@ -56,13 +70,22 @@ DV_PATTERNS = $(foreach dv, $(PATTERNS), verify-$(dv))
 TARGET_PATH=$(shell pwd)
 PDK_PATH=${PDK_ROOT}/sky130A
 VERIFY_COMMAND="cd ${TARGET_PATH}/verilog/dv/$* && export SIM=${SIM} DUMP=${DUMP} && make"
-$(DV_PATTERNS): verify-% : ./verilog/dv/% 
-# PDK ROOT is not defined, then use pdk from docker at opt/riscv_64
+$(DV_PATTERNS): verify-% : ./verilog/dv/% check-coremark_repo check-riscv_comp_repo check-riscv_test_repo
+	@if [ ! -d "$(PDK_ROOT)" ]; then \
 	docker run -v ${TARGET_PATH}:${TARGET_PATH}  \
+                -v ${CARAVEL_ROOT}:${CARAVEL_ROOT} \
                 -e TARGET_PATH=${TARGET_PATH} \
-                -e CARAVEL_ROOT=${TARGET_PATH}/caravel \
+                -e CARAVEL_ROOT=${CARAVEL_ROOT} \
                 -u $(id -u $$USER):$(id -g $$USER) dineshannayya/dv_setup:latest \
                 sh -c $(VERIFY_COMMAND); \
+	else \
+	docker run -v ${TARGET_PATH}:${TARGET_PATH} -v ${PDK_PATH}:${PDK_PATH} \
+                -v ${CARAVEL_ROOT}:${CARAVEL_ROOT} \
+                -e TARGET_PATH=${TARGET_PATH} -e PDK_PATH=${PDK_PATH} \
+                -e CARAVEL_ROOT=${CARAVEL_ROOT} \
+                -u $(id -u $$USER):$(id -g $$USER) dineshannayya/dv_setup:latest \
+                sh -c $(VERIFY_COMMAND); \
+	fi
 				
 # Openlane Makefile Targets
 BLOCKS = $(shell cd openlane && find * -maxdepth 0 -type d)
@@ -137,20 +160,20 @@ openlane:
 # Default installs to the user home directory, override by "export PRECHECK_ROOT=<precheck-installation-path>"
 .PHONY: precheck
 precheck:
-	@git clone https://github.com/efabless/open_mpw_precheck.git --depth=1 $(PRECHECK_ROOT)
-	@docker pull efabless/open_mpw_precheck:latest
+	@git clone https://github.com/efabless/mpw_precheck.git --depth=1 $(PRECHECK_ROOT)
+	@docker pull efabless/mpw_precheck:latest
 
 .PHONY: run-precheck
 run-precheck: check-precheck check-pdk check-caravel
-	$(eval TARGET_PATH := $(shell pwd))
+	$(eval INPUT_DIRECTORY := $(shell pwd))
 	cd $(PRECHECK_ROOT) && \
-	docker run -v $(PRECHECK_ROOT):/usr/local/bin -v $(TARGET_PATH):$(TARGET_PATH) -v $(PDK_ROOT):$(PDK_ROOT) -v $(CARAVEL_ROOT):$(CARAVEL_ROOT) \
-	-u $(shell id -u $(USER)):$(shell id -g $(USER)) efabless/open_mpw_precheck:latest bash -c "python3 open_mpw_prechecker.py --pdk_root $(PDK_ROOT) --target_path $(TARGET_PATH) -rfc -c $(CARAVEL_ROOT) "
+	docker run -e INPUT_DIRECTORY=$(INPUT_DIRECTORY) -e PDK_ROOT=$(PDK_ROOT) -e CARAVEL_ROOT=$(CARAVEL_ROOT) -v $(PRECHECK_ROOT):$(PRECHECK_ROOT) -v $(INPUT_DIRECTORY):$(INPUT_DIRECTORY) -v $(PDK_ROOT):$(PDK_ROOT) -v $(CARAVEL_ROOT):$(CARAVEL_ROOT) \
+	-u $(shell id -u $(USER)):$(shell id -g $(USER)) efabless/mpw_precheck:latest bash -c "cd $(PRECHECK_ROOT) ; python3 mpw_precheck.py --pdk_root $(PDK_ROOT) --input_directory $(INPUT_DIRECTORY) --caravel_root $(CARAVEL_ROOT)"
 
 # Install PDK using OL's Docker Image
 .PHONY: pdk-nonnative
 pdk-nonnative: skywater-pdk skywater-library skywater-timing open_pdks
-	docker run --rm -v $(PDK_ROOT):$(PDK_ROOT) -v $(pwd):/user_project -v $(CARAVEL_ROOT):$(CARAVEL_ROOT) -e CARAVEL_ROOT=$(CARAVEL_ROOT) -e PDK_ROOT=$(PDK_ROOT) -u $(shell id -u $(USER)):$(shell id -g $(USER)) efabless/openlane:current sh -c "cd $(CARAVEL_ROOT); make build-pdk; make gen-sources"
+	docker run --rm -v $(PDK_ROOT):$(PDK_ROOT) -v $(CARAVEL_ROOT):$(CARAVEL_ROOT) -e CARAVEL_ROOT=$(CARAVEL_ROOT) -e PDK_ROOT=$(PDK_ROOT) -u $(shell id -u $(USER)):$(shell id -g $(USER)) efabless/openlane:current sh -c "cd $(CARAVEL_ROOT); make build-pdk; make gen-sources"
 
 # Clean 
 .PHONY: clean
@@ -176,8 +199,28 @@ check-pdk:
 		exit 1; \
 	fi
 
+check-coremark_repo:
+	@if [ ! -d "$(COREMARK_DIR)" ]; then \
+		echo "Installing Core Mark Repo.."; \
+		git clone $(COREMARK_REPO) $(COREMARK_DIR); \
+		cd $(COREMARK_DIR); git checkout $(COREMARK_BRANCH); \
+	fi
+
+check-riscv_comp_repo:
+	@if [ ! -d "$(RISCV_COMP_DIR)" ]; then \
+		echo "Installing Risc V Complance Repo.."; \
+		git clone $(RISCV_COMP_REPO) $(RISCV_COMP_DIR); \
+		cd $(RISCV_COMP_DIR); git checkout $(RISCV_COMP_BRANCH); \
+	fi
+
+check-riscv_test_repo:
+	@if [ ! -d "$(RISCV_TEST_DIR)" ]; then \
+		echo "Installing RiscV Test Repo.."; \
+		git clone $(RISCV_TEST_REPO) $(RISCV_TEST_DIR); \
+		cd $(RISCV_TEST_DIR); git checkout $(RISCV_TEST_BRANCH); \
+	fi
+
 .PHONY: help
 help:
 	cd $(CARAVEL_ROOT) && $(MAKE) help 
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
-

@@ -94,6 +94,19 @@ later version.
 `include "sdrc_define.v"
 module sdrc_top 
            (
+`ifdef USE_POWER_PINS
+                    vccd1               ,// User area 1 1.8V supply
+                    vssd1               ,// User area 1 digital ground
+`endif
+   // Clock Skew Adjust
+                    wbd_clk_int         ,
+		    cfg_cska_sdram      ,
+	            wbd_clk_sdram       ,
+
+		    cfg_cska_sd_co      ,
+                    cfg_cska_sd_ci      ,
+
+
                     cfg_sdr_width       ,
                     cfg_colbits         ,
 
@@ -149,6 +162,18 @@ parameter      SDR_BW   = 1;   // SDR Byte Width
 parameter      tw       = 8;   // tag id width
 parameter      bl       = 9;   // burst_lenght_width 
 
+
+`ifdef USE_POWER_PINS
+input               vccd1               ;// User area 1 1.8V supply
+input               vssd1               ;// User area 1 digital ground
+`endif
+   // Clock Skew Adjust
+input               wbd_clk_int         ;
+output	            wbd_clk_sdram       ;
+input [3:0]	    cfg_cska_sdram      ;
+
+input [3:0]	    cfg_cska_sd_co      ;
+input [3:0]         cfg_cska_sd_ci      ;
 //-----------------------------------------------
 // Global Variable
 // ----------------------------------------------
@@ -240,6 +265,45 @@ wire [APP_DW-1:0]      wb_stag_dat_i     ;
 wire [APP_DW/8-1:0]    wb_stag_sel_i     ; // Byte enable
 wire  [APP_DW-1:0]     wb_stag_dat_o     ;
 wire                   wb_stag_cyc_i     ;
+
+wire                   sdram_clk_out     ;
+// sdram clock skew control
+clk_skew_adjust u_skew_sdram
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (wbd_clk_int                ), 
+	       .sel        (cfg_cska_sdram             ), 
+	       .clk_out    (wbd_clk_sdram              ) 
+       );
+
+
+// SDRAM clock out clock skew control
+clk_skew_adjust u_skew_sd_co
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (sdram_clk                  ), 
+	       .sel        (cfg_cska_sd_co             ), 
+	       .clk_out    (sdram_clk_out              ) 
+       );
+
+// Clock Skey for PAD SDRAM clock
+clk_skew_adjust u_skew_sd_ci
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (io_in[29]                  ), 
+	       .sel        (cfg_cska_sd_ci             ), 
+	       .clk_out    (sdram_pad_clk              ) 
+       );
+
 //-----------------------------------------------------------------
 // To avoid the logic at digital core, pad control are brought inside the
 // block to support efabless/carvel soc enviornmental support
@@ -254,8 +318,7 @@ assign io_out     [25]       =      sdr_cas_n          ;
 assign io_out     [26]       =      sdr_ras_n          ;
 assign io_out     [27]       =      sdr_cs_n           ;
 assign io_out     [28]       =      sdr_cke            ;
-assign io_out     [29]       =      sdram_clk          ;
-assign sdram_pad_clk         =      io_in[29]          ;
+assign io_out     [29]       =      sdram_clk_out      ;
 
 assign io_oeb     [7:0]      =      sdr_den_n         ;
 assign io_oeb     [20:8]     =      {(13) {1'b0}}      ;

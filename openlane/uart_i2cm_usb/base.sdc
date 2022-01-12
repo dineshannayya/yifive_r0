@@ -1,83 +1,76 @@
-# SPDX-FileCopyrightText:  2021 , Dinesh Annayya
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
+###############################################################################
+# Created by write_sdc
+# Sat Nov 13 06:42:06 2021
+###############################################################################
+current_design uart_i2c_usb_top
+###############################################################################
+# Timing Constraints
+###############################################################################
+create_clock -name app_clk -period 10.0000 [get_ports {app_clk}]
+create_clock -name line_clk -period 100.0000 [get_pins {u_uart_core.u_lineclk_buf.u_mux/X}]
+create_clock -name usb_clk -period 100.0000 [get_ports {usb_clk}]
+
+set_clock_transition 0.1500 [all_clocks]
+set_clock_uncertainty -setup 0.2500 [all_clocks]
+set_clock_uncertainty -hold 0.2500 [all_clocks]
 
 
-set_units -time ns
-set ::env(CORE_CLOCK_PERIOD) "10"
-set ::env(CORE_CLOCK_PORT)   "app_clk"
-set ::env(CORE_CLOCK_NAME)   "app_clk"
 
-set ::env(LINE_CLOCK_PERIOD) "100"
-set ::env(LINE_CLOCK_PORT)   "u_uart_core.u_lineclk_buf/X"
-set ::env(LINE_CLOCK_NAME)   "line_clk"
+set_clock_groups -name async_clock -asynchronous \
+ -group [get_clocks {app_clk}]\
+ -group [get_clocks {usb_clk}]\
+ -group [get_clocks {line_clk}] -comment {Async Clock group}
 
-set ::env(USB_CLOCK_PERIOD) "100"
-set ::env(USB_CLOCK_PORT)   "usb_clk"
-set ::env(USB_CLOCK_NAME)   "usb_clk"
-
-######################################
-# WB Clock domain input output
-######################################
-create_clock [get_ports $::env(CORE_CLOCK_PORT)]  -name $::env(CORE_CLOCK_NAME)  -period $::env(CORE_CLOCK_PERIOD)
-create_clock [get_pins  $::env(LINE_CLOCK_PORT)]  -name $::env(LINE_CLOCK_NAME)  -period $::env(LINE_CLOCK_PERIOD)
-create_clock [get_ports $::env(USB_CLOCK_PORT)]  -name $::env(USB_CLOCK_NAME)  -period $::env(USB_CLOCK_PERIOD)
-
-set core_input_delay_value [expr $::env(CORE_CLOCK_PERIOD) * 0.6]
-set core_output_delay_value [expr $::env(CORE_CLOCK_PERIOD) * 0.6]
-
-set line_input_delay_value  [expr $::env(LINE_CLOCK_PERIOD) * 0.6]
-set line_output_delay_value [expr $::env(LINE_CLOCK_PERIOD) * 0.6]
-
-set usb_input_delay_value  [expr $::env(USB_CLOCK_PERIOD) * 0.6]
-set usb_output_delay_value [expr $::env(USB_CLOCK_PERIOD) * 0.6]
-puts "\[INFO\]: Setting wb output delay to:$core_output_delay_value"
-puts "\[INFO\]: Setting wb input delay to: $core_input_delay_value"
+### ClkSkew Adjust
+set_case_analysis 0 [get_ports {cfg_cska_uart[0]}]
+set_case_analysis 0 [get_ports {cfg_cska_uart[1]}]
+set_case_analysis 0 [get_ports {cfg_cska_uart[2]}]
+set_case_analysis 0 [get_ports {cfg_cska_uart[3]}]
 
 
-set_input_delay 2.0 -clock [get_clocks $::env(CORE_CLOCK_NAME)] {uart_rstn}
-set_input_delay 2.0 -clock [get_clocks $::env(CORE_CLOCK_NAME)] {i2c_rstn}
-set_input_delay 2.0 -clock [get_clocks $::env(CORE_CLOCK_NAME)] {usb_rstn}
-set_input_delay 2.0 -clock [get_clocks $::env(CORE_CLOCK_NAME)] {uart_i2c_usb_sel*}
-
-set_input_delay  $core_input_delay_value   -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_cs*]
-set_input_delay  $core_input_delay_value   -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_addr*]
-set_input_delay  $core_input_delay_value   -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_wr*]
-set_input_delay  $core_input_delay_value   -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_be*]
-set_input_delay  $core_input_delay_value   -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_wdata*]
+set_max_delay 5 -from [get_ports {wbd_clk_int}]
+set_max_delay 5 -to   [get_ports {wbd_clk_uart}]
+set_max_delay 5 -from wbd_clk_int -to wbd_clk_uart
 
 
-set_output_delay $core_output_delay_value  -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_rdata*]
-set_output_delay $core_output_delay_value  -clock [get_clocks $::env(CORE_CLOCK_NAME)] [get_port reg_ack*]
 
-set_input_delay  $line_input_delay_value   -clock [get_clocks $::env(LINE_CLOCK_NAME)] [get_port io_in*]
-set_output_delay $line_input_delay_value   -clock [get_clocks $::env(LINE_CLOCK_NAME)] [get_port io_oeb*]
-set_output_delay $line_output_delay_value  -clock [get_clocks $::env(LINE_CLOCK_NAME)] [get_port io_out*]
+set_input_delay 3.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {i2c_rstn}]
+set_input_delay 3.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {uart_rstn}]
+set_input_delay 3.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {usb_rstn}]
 
 
-set_clock_groups -name async_clock -asynchronous -comment "Async Clock group" -group [get_clocks $::env(CORE_CLOCK_NAME)] -group [get_clocks $::env(LINE_CLOCK_NAME)] 
+set_input_delay  -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_addr[*]}]
+set_input_delay  -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_be[*]}]
+set_input_delay  -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_cs}]
+set_input_delay  -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_wdata[*]}]
+set_input_delay  -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_wr}]
 
-set_clock_uncertainty -from $::env(CORE_CLOCK_NAME)   -to $::env(CORE_CLOCK_NAME)  -setup 0.400
-set_clock_uncertainty -from $::env(LINE_CLOCK_NAME)   -to $::env(LINE_CLOCK_NAME) -setup 0.400
+set_input_delay  -min 2.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_addr[*]}]
+set_input_delay  -min 2.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_be[*]}]
+set_input_delay  -min 2.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_cs}]
+set_input_delay  -min 2.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_wdata[*]}]
+set_input_delay  -min 2.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_wr}]
 
-set_clock_uncertainty -from $::env(CORE_CLOCK_NAME)   -to $::env(CORE_CLOCK_NAME)  -hold 0.050
-set_clock_uncertainty -from $::env(LINE_CLOCK_NAME)   -to $::env(LINE_CLOCK_NAME) -hold 0.050
 
-# TODO set this as parameter
-set_driving_cell -lib_cell $::env(SYNTH_DRIVING_CELL) -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
+set_output_delay -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_ack}]
+set_output_delay -max 6.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_rdata[*]}]
+
+set_output_delay -min 1.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_ack}]
+set_output_delay -min 1.0000 -clock [get_clocks {app_clk}] -add_delay [get_ports {reg_rdata[*]}]
+
+###############################################################################
+# Environment
+###############################################################################
+set_driving_cell -lib_cell sky130_fd_sc_hd__inv_8 -pin $::env(SYNTH_DRIVING_CELL_PIN) [all_inputs]
 set cap_load [expr $::env(SYNTH_CAP_LOAD) / 1000.0]
 puts "\[INFO\]: Setting load to: $cap_load"
 set_load  $cap_load [all_outputs]
 
+set ::env(SYNTH_TIMING_DERATE) 0.05
+puts "\[INFO\]: Setting timing derate to: [expr {$::env(SYNTH_TIMING_DERATE) * 10}] %"
+set_timing_derate -early [expr {1-$::env(SYNTH_TIMING_DERATE)}]
+set_timing_derate -late [expr {1+$::env(SYNTH_TIMING_DERATE)}]
+
+###############################################################################
+# Design Rules
+###############################################################################

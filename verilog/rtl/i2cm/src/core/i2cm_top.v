@@ -130,18 +130,36 @@ module i2cm_top(
 	// module body
 	//
 
-
-	// generate wishbone signals
-	wire wb_wacc = wb_we_i & wb_ack_o;
+        //-----------------------------------------------------------------------
+        // Internal Logic Starts here
+        //-----------------------------------------------------------------------
+	reg  [2:0] sw_addr;
+	reg        sw_rd_en;
+	reg        sw_wr_en;
+	reg        wr_be;
+        always @ (posedge wb_clk_i or negedge aresetn)
+        begin
+           if (aresetn == 1'b0) begin
+                sw_addr       <= 'h0;
+                sw_rd_en      <= 'h0;
+                sw_wr_en      <= 'h0;
+                wr_be         <= 'h0;
+           end else begin
+                sw_addr       <= wb_adr_i [2:0];
+                sw_rd_en      <= wb_cyc_i & wb_stb_i & !wb_we_i & !wb_ack_o ;
+                sw_wr_en      <= wb_cyc_i & wb_stb_i & wb_we_i  & !wb_ack_o;
+                wr_be         <= wb_we_i;
+           end
+        end
 
 	// generate acknowledge output signal
 	always @(posedge wb_clk_i)
-	  wb_ack_o <= #1 wb_cyc_i & wb_stb_i & ~wb_ack_o; // because timing is always honored
+	  wb_ack_o <= #1 (sw_rd_en | sw_wr_en) & ~wb_ack_o; // because timing is always honored
 
 	// assign DAT_O
 	always @(posedge wb_clk_i)
 	begin
-	  case (wb_adr_i) // synopsys parallel_case
+	  case (sw_addr) // synopsys parallel_case
 	    3'b000: wb_dat_o <= #1 prer[ 7:0];
 	    3'b001: wb_dat_o <= #1 prer[15:8];
 	    3'b010: wb_dat_o <= #1 ctr;
@@ -168,8 +186,8 @@ module i2cm_top(
 	        txr  <= #1  8'h0;
 	    end
 	  else
-	    if (wb_wacc)
-	      case (wb_adr_i) // synopsys parallel_case
+	    if (sw_wr_en)
+	      case (sw_addr) // synopsys parallel_case
 	         3'b000 : prer [ 7:0] <= #1 wb_dat_i;
 	         3'b001 : prer [15:8] <= #1 wb_dat_i;
 	         3'b010 : ctr         <= #1 wb_dat_i;
@@ -183,9 +201,9 @@ module i2cm_top(
 	    cr <= #1 8'h0;
 	  else if (!sresetn)
 	    cr <= #1 8'h0;
-	  else if (wb_wacc)
+	  else if (sw_wr_en)
 	    begin
-	        if (core_en & (wb_adr_i == 3'b100) )
+	        if (core_en & (sw_addr == 3'b100) )
 	          cr <= #1 wb_dat_i;
 	    end
 	  else

@@ -36,6 +36,9 @@
 ////  Revision :                                                  ////
 ////    0.1 - 25th Feb 2021, Dinesh A                             ////
 ////          initial version                                     ////
+////    0.2 - Nov 14 2021, Dinesh A                               ////
+////          Reset connectivity bug fix clk_ctl in u_sdramclk    ////
+////          u_cpuclk,u_rtcclk,u_usbclk
 //////////////////////////////////////////////////////////////////////
 ////                                                              ////
 //// Copyright (C) 2000 Authors and OPENCORES.ORG                 ////
@@ -83,7 +86,7 @@ module wb_host (
        output logic                sdram_rst_n      ,
        output logic                uart_rst_n       ,
        output logic                i2cm_rst_n       ,
-       output logic                usb_rst_n        ,
+       output logic                mbist_rst_n        ,
        output logic  [1:0]         uart_i2c_usb_sel ,
 
     // Master Port
@@ -99,6 +102,11 @@ module wb_host (
        output  logic               wbm_ack_o        ,  // acknowlegement
        output  logic               wbm_err_o        ,  // error
 
+    // Clock Skew Adjust
+       input   logic               wbd_clk_int      , 
+       output  logic               wbd_clk_wh       ,
+       input   logic [3:0]         cfg_cska_wh      , // clock skew adjust for web host
+
     // Slave Port
        output  logic               wbs_clk_out      ,  // System clock
        input   logic               wbs_clk_i        ,  // System clock
@@ -112,8 +120,10 @@ module wb_host (
        input   logic               wbs_ack_i        ,  // acknowlegement
        input   logic               wbs_err_i        ,  // error
 
+       output logic [3:0]          cfg_boot_remap   ,
        output logic [31:0]         cfg_clk_ctrl1    ,
-       output logic [31:0]         cfg_clk_ctrl2    
+       output logic [31:0]         cfg_clk_ctrl2    ,
+       input  logic                la_data_in       
 
     );
 
@@ -155,16 +165,43 @@ logic  [3:0]        cfg_usb_clk_ctrl;
 logic  [6:0]        cfg_glb_ctrl;
 
 
-assign wbm_rst_n = !wbm_rst_i;
-assign wbs_rst_n = !wbm_rst_i;
+ctech_buf u_buf_wb_rst        (.A(cfg_glb_ctrl[0]),.X(wbd_int_rst_n));
+ctech_buf u_buf_cpu_rst       (.A(cfg_glb_ctrl[1]),.X(cpu_rst_n));
+ctech_buf u_buf_spi_rst       (.A(cfg_glb_ctrl[2]),.X(spi_rst_n));
+ctech_buf u_buf_sdram_rst     (.A(cfg_glb_ctrl[3]),.X(sdram_rst_n));
+ctech_buf u_buf_uart_rst      (.A(cfg_glb_ctrl[4]),.X(uart_rst_n));
+ctech_buf u_buf_i2cm_rst      (.A(cfg_glb_ctrl[5]),.X(i2cm_rst_n));
+ctech_buf u_buf_mbist_rst     (.A(cfg_glb_ctrl[6]),.X(mbist_rst_n));
 
-sky130_fd_sc_hd__bufbuf_16 u_buf_wb_rst        (.A(cfg_glb_ctrl[0]),.X(wbd_int_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_cpu_rst       (.A(cfg_glb_ctrl[1]),.X(cpu_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_spi_rst       (.A(cfg_glb_ctrl[2]),.X(spi_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_sdram_rst     (.A(cfg_glb_ctrl[3]),.X(sdram_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_uart_rst      (.A(cfg_glb_ctrl[4]),.X(uart_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_i2cm_rst      (.A(cfg_glb_ctrl[5]),.X(i2cm_rst_n));
-sky130_fd_sc_hd__bufbuf_16 u_buf_usb_rst       (.A(cfg_glb_ctrl[6]),.X(usb_rst_n));
+//--------------------------------------------------------------------------------
+// Look like wishbone reset removed early than user Power up sequence
+// To control the reset phase, we have added additional control through la[0]
+// ------------------------------------------------------------------------------
+wire    arst_n = !wbm_rst_i & la_data_in;
+reset_sync  u_wbm_rst (
+	      .scan_mode  (1'b0           ),
+              .dclk       (wbm_clk_i      ), // Destination clock domain
+	      .arst_n     (arst_n         ), // active low async reset
+              .srst_n     (wbm_rst_n      )
+          );
+
+reset_sync  u_wbs_rst (
+	      .scan_mode  (1'b0           ),
+              .dclk       (wbs_clk_i      ), // Destination clock domain
+	      .arst_n     (arst_n         ), // active low async reset
+              .srst_n     (wbs_rst_n      )
+          );
+// wb_host clock skew control
+clk_skew_adjust u_skew_wh
+       (
+`ifdef USE_POWER_PINS
+               .vccd1      (vccd1                      ),// User area 1 1.8V supply
+               .vssd1      (vssd1                      ),// User area 1 digital ground
+`endif
+	       .clk_in     (wbd_clk_int               ), 
+	       .sel        (cfg_cska_wh               ), 
+	       .clk_out    (wbd_clk_wh                ) 
+       );
 
 
 // To reduce the load/Timing Wishbone I/F, Strobe is register to create
@@ -245,7 +282,7 @@ begin
 
   case (sw_addr [1:0])
     2'b00 :   reg_out [31:0] = reg_0;
-    2'b01 :   reg_out [31:0] = {24'h0,cfg_bank_sel [7:0]};     
+    2'b01 :   reg_out [31:0] = {20'h0,cfg_boot_remap[3:0],cfg_bank_sel [7:0]};     
     2'b10 :   reg_out [31:0] = cfg_clk_ctrl1 [31:0];    
     2'b11 :   reg_out [31:0] = cfg_clk_ctrl2 [31:0];     
     default : reg_out [31:0] = 'h0;
@@ -255,8 +292,8 @@ end
 
 
 generic_register #(32,0  ) u_glb_ctrl (
-	      .we            ({24{sw_wr_en_0}}   ),		 
-	      .data_in       (wbm_dat_i[23:0]    ),
+	      .we            ({32{sw_wr_en_0}}   ),		 
+	      .data_in       (wbm_dat_i[31:0]    ),
 	      .reset_n       (wbm_rst_n         ),
 	      .clk           (wbm_clk_i         ),
 	      
@@ -264,7 +301,7 @@ generic_register #(32,0  ) u_glb_ctrl (
 	      .data_out      (reg_0[31:0])
           );
 
-generic_register #(8,8'h30 ) u_bank_sel (
+generic_register #(8,8'h10 ) u_bank_sel (
 	      .we            ({8{sw_wr_en_1}}   ),		 
 	      .data_in       (wbm_dat_i[7:0]    ),
 	      .reset_n       (wbm_rst_n         ),
@@ -272,6 +309,16 @@ generic_register #(8,8'h30 ) u_bank_sel (
 	      
 	      //List of Outs
 	      .data_out      (cfg_bank_sel[7:0] )
+          );
+
+generic_register #(4,4'h0 ) u_boot_remap (
+	      .we            ({4{sw_wr_en_1}}   ),		 
+	      .data_in       (wbm_dat_i[11:8]    ),
+	      .reset_n       (wbm_rst_n         ),
+	      .clk           (wbm_clk_i         ),
+	      
+	      //List of Outs
+	      .data_out      (cfg_boot_remap[3:0] )
           );
 
 
@@ -343,7 +390,8 @@ assign    cfg_wb_clk_ratio =  cfg_wb_clk_ctrl[1:0];
 assign    cfg_wb_clk_div   =  cfg_wb_clk_ctrl[2];
 
 
-assign wbs_clk_out  = (cfg_wb_clk_div)  ? wb_clk_div : wbm_clk_i;
+//assign wbs_clk_out  = (cfg_wb_clk_div)  ? wb_clk_div : wbm_clk_i;
+ctech_mux2x1 u_wbs_clk_sel (.A0 (wbm_clk_i), .A1 (wb_clk_div), .S  (cfg_wb_clk_div), .X  (wbs_clk_out));
 
 
 clk_ctl #(1) u_wbclk (
@@ -362,20 +410,22 @@ wire   sdram_clk_div;
 wire   sdram_ref_clk;
 wire   sdram_clk_int;
 
-wire       cfg_sdram_clk_src_sel   = cfg_sdram_clk_ctrl[0];
-wire       cfg_sdram_clk_div       = cfg_sdram_clk_ctrl[1];
-wire [1:0] cfg_sdram_clk_ratio     = cfg_sdram_clk_ctrl[3:2];
-assign sdram_ref_clk = (cfg_sdram_clk_src_sel) ? user_clock2 :user_clock1;
-assign sdram_clk_int = (cfg_sdram_clk_div) ? sdram_clk_div : sdram_ref_clk;
+wire       cfg_sdram_clk_src_sel   = cfg_sdram_clk_ctrl[3];
+wire       cfg_sdram_clk_div       = cfg_sdram_clk_ctrl[2];
+wire [1:0] cfg_sdram_clk_ratio     = cfg_sdram_clk_ctrl[1:0];
+//assign sdram_ref_clk = (cfg_sdram_clk_src_sel) ? user_clock2 :user_clock1;
+//assign sdram_clk_int = (cfg_sdram_clk_div) ? sdram_clk_div : sdram_ref_clk;
+ctech_mux2x1 u_sdram_ref_sel (.A0 (user_clock1),   .A1 (user_clock2),   .S(cfg_sdram_clk_src_sel), .X(sdram_ref_clk));
+ctech_mux2x1 u_sdram_clk_sel (.A0 (sdram_ref_clk), .A1 (sdram_clk_div), .S(cfg_sdram_clk_div),     .X(sdram_clk_int));
 
-sky130_fd_sc_hd__clkbuf_16 u_clkbuf_sdram (.A (sdram_clk_int), . X(sdram_clk));
+ctech_clk_buf u_clkbuf_sdram (.A (sdram_clk_int), . X(sdram_clk));
 
 clk_ctl #(1) u_sdramclk (
    // Outputs
        .clk_o         (sdram_clk_div      ),
    // Inputs
        .mclk          (sdram_ref_clk      ),
-       .reset_n       (reset_n            ), 
+       .reset_n       (wbm_rst_n          ), 
        .clk_div_ratio (cfg_sdram_clk_ratio)
    );
 
@@ -387,22 +437,24 @@ wire   cpu_clk_div;
 wire   cpu_ref_clk;
 wire   cpu_clk_int;
 
-wire       cfg_cpu_clk_src_sel   = cfg_cpu_clk_ctrl[0];
-wire       cfg_cpu_clk_div       = cfg_cpu_clk_ctrl[1];
-wire [1:0] cfg_cpu_clk_ratio     = cfg_cpu_clk_ctrl[3:2];
+wire       cfg_cpu_clk_src_sel   = cfg_cpu_clk_ctrl[3];
+wire       cfg_cpu_clk_div       = cfg_cpu_clk_ctrl[2];
+wire [1:0] cfg_cpu_clk_ratio     = cfg_cpu_clk_ctrl[1:0];
 
-assign cpu_ref_clk = (cfg_cpu_clk_src_sel) ? user_clock2 : user_clock1;
-assign cpu_clk_int = (cfg_cpu_clk_div)     ? cpu_clk_div : cpu_ref_clk;
+//assign cpu_ref_clk = (cfg_cpu_clk_src_sel) ? user_clock2 : user_clock1;
+//assign cpu_clk_int = (cfg_cpu_clk_div)     ? cpu_clk_div : cpu_ref_clk;
 
+ctech_mux2x1 u_cpu_ref_sel (.A0 (user_clock1), .A1 (user_clock2), .S  (cfg_cpu_clk_src_sel), .X  (cpu_ref_clk));
+ctech_mux2x1 u_cpu_clk_sel (.A0 (cpu_ref_clk), .A1 (cpu_clk_div), .S  (cfg_cpu_clk_div),     .X  (cpu_clk_int));
 
-sky130_fd_sc_hd__clkbuf_16 u_clkbuf_cpu (.A (cpu_clk_int), . X(cpu_clk));
+ctech_clk_buf u_clkbuf_cpu (.A (cpu_clk_int), . X(cpu_clk));
 
 clk_ctl #(1) u_cpuclk (
    // Outputs
        .clk_o         (cpu_clk_div      ),
    // Inputs
        .mclk          (cpu_ref_clk      ),
-       .reset_n       (reset_n          ), 
+       .reset_n       (wbm_rst_n        ), 
        .clk_div_ratio (cfg_cpu_clk_ratio)
    );
 
@@ -413,14 +465,14 @@ wire   rtc_clk_div;
 wire [7:0] cfg_rtc_clk_ratio     = cfg_rtc_clk_ctrl[7:0];
 
 
-sky130_fd_sc_hd__clkbuf_16 u_clkbuf_rtc (.A (rtc_clk_div), . X(rtc_clk));
+ctech_clk_buf u_clkbuf_rtc (.A (rtc_clk_div), . X(rtc_clk));
 
 clk_ctl #(7) u_rtcclk (
    // Outputs
        .clk_o         (rtc_clk_div      ),
    // Inputs
        .mclk          (user_clock2      ),
-       .reset_n       (reset_n          ), 
+       .reset_n       (wbm_rst_n        ), 
        .clk_div_ratio (cfg_rtc_clk_ratio)
    );
 
@@ -432,21 +484,22 @@ wire   usb_clk_div;
 wire   usb_ref_clk;
 wire   usb_clk_int;
 
-wire       cfg_usb_clk_div       = cfg_usb_clk_ctrl[0];
-wire [2:0] cfg_usb_clk_ratio     = cfg_usb_clk_ctrl[3:1];
+wire       cfg_usb_clk_div       = cfg_usb_clk_ctrl[3];
+wire [2:0] cfg_usb_clk_ratio     = cfg_usb_clk_ctrl[2:0];
 
 assign usb_ref_clk = user_clock2 ;
-assign usb_clk_int = (cfg_usb_clk_div)     ? usb_clk_div : usb_ref_clk;
+//assign usb_clk_int = (cfg_usb_clk_div)     ? usb_clk_div : usb_ref_clk;
+ctech_mux2x1 u_usb_clk_sel (.A0 (usb_ref_clk), .A1 (usb_clk_div), .S  (cfg_usb_clk_div), .X  (usb_clk_int));
 
 
-sky130_fd_sc_hd__clkbuf_16 u_clkbuf_usb (.A (usb_clk_int), . X(usb_clk));
+ctech_clk_buf u_clkbuf_usb (.A (usb_clk_int), . X(usb_clk));
 
 clk_ctl #(2) u_usbclk (
    // Outputs
        .clk_o         (usb_clk_div      ),
    // Inputs
        .mclk          (usb_ref_clk      ),
-       .reset_n       (reset_n          ), 
+       .reset_n       (wbm_rst_n        ), 
        .clk_div_ratio (cfg_usb_clk_ratio)
    );
 
