@@ -71,11 +71,8 @@
 
 `timescale 1 ns / 1 ps
 
-`include "s25fl256s.sv"
-`include "uprj_netlists.v"
-`include "caravel_netlists.v"
-`include "spiflash.v"
 `include "mt48lc8m8a2.v"
+`include "s25fl256s.sv"
 `include "uart_agent.v"
 
 module risc_boot_tb;
@@ -158,7 +155,7 @@ module risc_boot_tb;
 	   $display("Monitor: Test User Risc Boot Started");
        
 	   // Wait for user risc core to boot up 
-           repeat (25000) @(posedge clock);  
+           repeat (33000) @(posedge clock);  
            tb_uart.uart_init;
            tb_uart.control_setup (uart_data_bit, uart_stop_bits, uart_parity_en, uart_even_odd_parity, 
         	                          uart_stick_parity, uart_timeout, uart_divisor);

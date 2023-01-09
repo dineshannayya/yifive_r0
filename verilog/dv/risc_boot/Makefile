@@ -14,36 +14,94 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-## Caravel Pointers
-CARAVEL_ROOT ?= ../../../caravel
-CARAVEL_PATH ?= $(CARAVEL_ROOT)
-CARAVEL_FIRMWARE_PATH = $(CARAVEL_PATH)/verilog/dv/caravel
-CARAVEL_VERILOG_PATH  = $(CARAVEL_PATH)/verilog
-CARAVEL_RTL_PATH = $(CARAVEL_VERILOG_PATH)/rtl
-CARAVEL_BEHAVIOURAL_MODELS = $(CARAVEL_VERILOG_PATH)/dv/caravel
 
+ 
+PWDD := $(shell pwd)
+BLOCKS := $(shell basename $(PWDD))
 
-## User Project Pointers
-UPRJ_VERILOG_PATH ?= ../../../verilog
-UPRJ_RTL_PATH = $(UPRJ_VERILOG_PATH)/rtl
-UPRJ_BEHAVIOURAL_MODELS = ../model
-UPRJ_BEHAVIOURAL_AGENTS = ../agents
-UPRJ_INCLUDE_PATH1 = $(UPRJ_RTL_PATH)/syntacore/scr1/src/includes
-UPRJ_INCLUDE_PATH2 = $(UPRJ_RTL_PATH)/sdram_ctrl/src/defs
-UPRJ_INCLUDE_PATH3 = $(UPRJ_RTL_PATH)/i2cm/src/includes
-UPRJ_INCLUDE_PATH4 = $(UPRJ_RTL_PATH)/usb1_host/src/includes
+# ---- Include Partitioned Makefiles ----
+
+DESIGNS?=../../..
+CONFIG = caravel_user_project
+TOOLS?=/opt/riscv32i/
 
 ## SYNTACORE FIRMWARE
-SYNTACORE_FIRMWARE_PATH = $(UPRJ_VERILOG_PATH)/rtl/syntacore/scr1/sim/tests/common
+SYNTACORE_FIRMWARE_PATH = $(DESIGNS)/verilog/rtl/syntacore/scr1/sim/tests/common
 GCC64_PREFIX?=riscv64-unknown-elf
 
-## RISCV GCC 
-GCC_PATH?=/ef/apps/bin
+########################################################
+#include $(MCW_ROOT)/verilog/dv/make/env.makefile
+########################################################
+#######################################################################
+## Global Environment Variables for local repo  
+#######################################################################
+
+export PDK_PATH =      $(PDK_ROOT)/sky130A
+export VIP_PATH =      $(CORE_VERILOG_PATH)/dv/vip
+export FIRMWARE_PATH = $(CORE_VERILOG_PATH)/dv/firmware
+
+#######################################################################
+## Caravel Verilog for Integration Tests
+#######################################################################
+
+export CARAVEL_VERILOG_PATH ?=  $(CARAVEL_ROOT)/verilog
+export CORE_VERILOG_PATH    ?=  $(CARAVEL_ROOT)/mgmt_core_wrapper/verilog
+export USER_PROJECT_VERILOG ?=  $(DESIGNS)/verilog
+
+export CARAVEL_PATH = $(CARAVEL_VERILOG_PATH)
+export VERILOG_PATH = $(CORE_VERILOG_PATH)
+#######################################################################
+## Compiler Information 
+#######################################################################
+export TOOLS     ?=  /opt/riscv32i 
+export GCC_PATH  ?=  $(TOOLS)/bin
 GCC_PREFIX?=riscv32-unknown-elf
 PDK_PATH?=/ef/tech/SW/sky130A
 
+export IVERILOG_DUMPER = fst
 ## Simulation mode: RTL/GL
 SIM?=RTL
+DUMP?=OFF
+
+#######################################################################
+## Compiler Information 
+#######################################################################
+########################################################
+#include $(MCW_ROOT)/verilog/dv/make/var.makefile
+########################################################
+
+CPU=vexriscv
+CPUFAMILY=riscv
+CPUFLAGS=-march=rv32i      -mabi=ilp32 -D__vexriscv__
+CPUENDIANNESS=little
+CLANG=0
+
+
+######################################################
+# include $(MCW_ROOT)/verilog/dv/make/cpu.makefile
+######################################################
+
+ifeq ($(CPU),picorv32)
+	LINKER_SCRIPT=$(FIRMWARE_PATH)/sections.lds
+	SOURCE_FILES=$(FIRMWARE_PATH)/start.s 
+	VERILOG_FILES=
+endif
+
+ifeq ($(CPU),ibex)
+	LINKER_SCRIPT=$(FIRMWARE_PATH)/link_ibex.ld
+	SOURCE_FILES=$(FIRMWARE_PATH)/crt0_ibex.S $(FIRMWARE_PATH)/simple_system_common.c
+# 	VERILOG_FILES=../ibex/*
+	VERILOG_FILES=
+endif
+
+ifeq ($(CPU),vexriscv)
+# 	LINKER_SCRIPT=$(FIRMWARE_PATH)/sections_vexriscv.lds
+# 	SOURCE_FILES=$(FIRMWARE_PATH)/start_caravel_vexriscv.s
+	LINKER_SCRIPT=$(FIRMWARE_PATH)/sections.lds
+	SOURCE_FILES=$(FIRMWARE_PATH)/crt0_vex.S $(FIRMWARE_PATH)/isr.c
+	VERILOG_FILES=
+endif
+
 
 .SUFFIXES:
 
@@ -56,41 +114,85 @@ hex:  ${PATTERN:=.hex}
 vvp:  ${PATTERN:=.vvp}
 
 %.vvp: %_tb.v %.hex
-	${GCC64_PREFIX}-gcc -O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las  -D__RVC_EXT -static -std=gnu99 -fno-common -fno-builtin-printf -DTCM=1 -Wa,-march=rv32imc -march=rv32imc -mabi=ilp32 -DFLAGS_STR=\""-O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las "\"  -c -I./ -I$(SYNTACORE_FIRMWARE_PATH)  user_uart.c -o user_uart.o
-	${GCC64_PREFIX}-gcc -O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las  -D__RVC_EXT -static -std=gnu99 -fno-common -fno-builtin-printf -DTCM=1 -Wa,-march=rv32imc -march=rv32imc -mabi=ilp32 -DFLAGS_STR=\""-O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las "\"  -D__ASSEMBLY__=1 -c -I./ -I$(SYNTACORE_FIRMWARE_PATH)  $(SYNTACORE_FIRMWARE_PATH)/crt_tcm.S -o crt_tcm.o
-	${GCC64_PREFIX}-gcc -march=rv32imc -mabi=ilp32 -T $(SYNTACORE_FIRMWARE_PATH)/link_tcm.ld user_uart.o crt_tcm.o -nostartfiles -nostdlib -lc -lgcc -o user_uart.elf -N
+	${GCC64_PREFIX}-gcc -O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las  -D__RVC_EXT -static -std=gnu99 -fno-common -fno-builtin-printf -DTCM=0 -Wa,-march=rv32imc -march=rv32imc -mabi=ilp32 -DFLAGS_STR=\""-O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las "\"  -c -I./ -I$(SYNTACORE_FIRMWARE_PATH)  user_uart.c -o user_uart.o
+	${GCC64_PREFIX}-gcc -O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las  -D__RVC_EXT -static -std=gnu99 -fno-common -fno-builtin-printf -DTCM=0 -Wa,-march=rv32imc -march=rv32imc -mabi=ilp32 -DFLAGS_STR=\""-O2 -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las "\"  -D__ASSEMBLY__=1 -c -I./ -I$(SYNTACORE_FIRMWARE_PATH)  $(SYNTACORE_FIRMWARE_PATH)/crt.S -o crt.o
+	${GCC64_PREFIX}-gcc -march=rv32imc -mabi=ilp32 -T $(SYNTACORE_FIRMWARE_PATH)/link.ld user_uart.o crt.o -nostartfiles -nostdlib -lc -lgcc -o user_uart.elf -N
 	${GCC64_PREFIX}-objcopy -O verilog user_uart.elf user_uart.hex
 	${GCC64_PREFIX}-objdump -D user_uart.elf > user_uart.dump
-	rm crt_tcm.o user_uart.o
+	rm crt.o user_uart.o
+## RTL
 ifeq ($(SIM),RTL)
-	iverilog -g2012 -DFUNCTIONAL -DSIM -I $(PDK_PATH) \
-	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) \
-	-I $(UPRJ_BEHAVIOURAL_MODELS)    -I $(UPRJ_RTL_PATH) -I $(UPRJ_VERILOG_PATH)  \
-	-I $(UPRJ_BEHAVIOURAL_AGENTS)    \
-	-I $(UPRJ_INCLUDE_PATH1)    -I $(UPRJ_INCLUDE_PATH2) -I $(UPRJ_INCLUDE_PATH3) \
-	-I $(UPRJ_INCLUDE_PATH4) \
-	$< -o $@ 
-else  
-	iverilog -DFUNCTIONAL -DSIM -DGL -I $(PDK_PATH) \
-	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) -I $(CARAVEL_VERILOG_PATH) \
-	-I $(UPRJ_BEHAVIOURAL_MODELS) -I$(UPRJ_RTL_PATH)   -I $(UPRJ_VERILOG_PATH) \
-	-I $(UPRJ_BEHAVIOURAL_AGENTS)    \
-	$< -o $@ 
+   ifeq ($(DUMP),OFF)
+	iverilog -g2005-sv -Ttyp -DFUNCTIONAL -DSIM -DUSE_POWER_PINS -DUNIT_DELAY=#0.1 \
+        -f$(VERILOG_PATH)/includes/includes.rtl.caravel \
+        -f$(USER_PROJECT_VERILOG)/includes/includes.rtl.$(CONFIG) -o $@ $<
+    else  
+	iverilog -g2005-sv -DWFDUMP -Ttyp -DFUNCTIONAL -DSIM -DUSE_POWER_PINS -DUNIT_DELAY=#0.1 \
+        -f$(VERILOG_PATH)/includes/includes.rtl.caravel \
+        -f$(USER_PROJECT_VERILOG)/includes/includes.rtl.$(CONFIG) -o $@ $<
+   endif
+endif
+
+##GL
+ifeq ($(SIM),GL)
+   ifeq ($(DUMP),OFF)
+	iverilog -Ttyp -DFUNCTIONAL -DGL -DUSE_POWER_PINS -DUNIT_DELAY=#0.1 \
+        -f$(VERILOG_PATH)/includes/includes.gl.caravel \
+        -f$(USER_PROJECT_VERILOG)/includes/includes.gl.$(CONFIG) -o $@ $<
+    else
+	iverilog -Ttyp -DWFDUMP -DFUNCTIONAL -DGL -DUSE_POWER_PINS -DUNIT_DELAY=#0.1 \
+        -f$(VERILOG_PATH)/includes/includes.gl.caravel \
+        -f$(USER_PROJECT_VERILOG)/includes/includes.gl.$(CONFIG) -o $@ $<
+    endif
+endif 
+
+## GL+SDF
+ifeq ($(SIM),GL_SDF)
+    ifeq ($(CONFIG),caravel_user_project)
+		cvc64  +interp \
+		+define+SIM +define+FUNCTIONAL +define+GL +define+USE_POWER_PINS +define+UNIT_DELAY +define+ENABLE_SDF \
+		+change_port_type +dump2fst +fst+parallel2=on   +nointeractive +notimingchecks +mipdopt \
+		-f $(VERILOG_PATH)/includes/includes.gl+sdf.caravel \
+		-f $(USER_PROJECT_VERILOG)/includes/includes.gl+sdf.$(CONFIG) $<
+	else
+		cvc64  +interp \
+		+define+SIM +define+FUNCTIONAL +define+GL +define+USE_POWER_PINS +define+UNIT_DELAY +define+ENABLE_SDF \
+		+change_port_type +dump2fst +fst+parallel2=on   +nointeractive +notimingchecks +mipdopt \
+		-f $(VERILOG_PATH)/includes/includes.gl+sdf.$(CONFIG) \
+		-f $CARAVEL_PATH/gl/__user_project_wrapper.v $<
+    endif
 endif
 
 %.vcd: %.vvp
 	vvp $<
 
-%.elf: %.c $(CARAVEL_FIRMWARE_PATH)/sections.lds $(CARAVEL_FIRMWARE_PATH)/start.s
-	${GCC64_PREFIX}-gcc -I $(CARAVEL_PATH) -march=rv32imc -mabi=ilp32 -Wl,-Bstatic,-T,$(CARAVEL_FIRMWARE_PATH)/sections.lds,--strip-debug -ffreestanding -nostdlib -o $@ $(CARAVEL_FIRMWARE_PATH)/start.s $<
+#.SUFFIXES:
+
+##############################################################################
+# Comiple firmeware
+##############################################################################
+%.elf: %.c $(LINKER_SCRIPT) $(SOURCE_FILES)
+	${GCC_PREFIX}-gcc -g \
+	-I$(FIRMWARE_PATH) \
+	-I$(VERILOG_PATH)/dv/generated \
+	-I$(VERILOG_PATH)/dv/ \
+	-I$(VERILOG_PATH)/common \
+	-I$(USER_FIRMWARE_PATH) \
+	  $(CPUFLAGS) \
+	-Wl,-Bstatic,-T,$(LINKER_SCRIPT),--strip-debug \
+	-ffreestanding -nostdlib -o $@ $(SOURCE_FILES) $<
+
+%.lst: %.elf
+	${GCC_PREFIX}-objdump -d -S $< > $@
 
 %.hex: %.elf
-	${GCC64_PREFIX}-objcopy -O verilog $< $@ 
+	${GCC_PREFIX}-objcopy -O verilog $< $@ 
 	# to fix flash base address
-	sed -i 's/@10000000/@00000000/g' $@
+	sed -ie 's/@10/@00/g' $@
 
 %.bin: %.elf
-	${GCC64_PREFIX}-objcopy -O binary $< /dev/stdout | tail -c +1048577 > $@
+	${GCC_PREFIX}-objcopy -O binary $< /dev/stdout | tail -c +1048577 > $@
+	
 
 # ---- Clean ----
 

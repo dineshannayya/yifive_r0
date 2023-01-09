@@ -16,8 +16,8 @@
  */
 
 // This include is relative to $CARAVEL_PATH (see Makefile)
-#include "verilog/dv/caravel/defs.h"
-#include "verilog/dv/caravel/stub.c"
+#include <defs.h>
+#include <stub.c>
 
 // User Project Slaves (0x3000_0000)
 
@@ -89,7 +89,9 @@ void main()
 	/* Set up the housekeeping SPI to be connected internally so	*/
 	/* that external pin changes don't affect it.			*/
 
-	reg_spimaster_config = 0xa002;	// Enable, prescaler = 2,
+        reg_spi_enable = 0;
+        reg_wb_enable = 1;
+	// reg_spimaster_config = 0xa002;	// Enable, prescaler = 2,
                                         // connect to housekeeping SPI
 
 	// Connect the housekeeping SPI to the SPI master
@@ -169,21 +171,7 @@ void main()
     reg_mprj_xfer = 1;
     while (reg_mprj_xfer == 1);
 
-    // Remove Wishbone Reset
-    reg_mprj_wbhost_reg0 = 0x1;
-
-    // SDRAM Config-2
-    reg_mprj_globl_reg5  = 0x100019E; 
-
-
-    // SDRAM Config-1
-    reg_mprj_globl_reg4  = 0x2F172242;
-
     // Remove All Reset
     reg_mprj_wbhost_reg0 = 0x1F;
-
-
-    // configure the user uart
-    reg_mprj_uart_reg0  = 0x7;
 
 }
