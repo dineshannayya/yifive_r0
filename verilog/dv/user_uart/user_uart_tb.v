@@ -178,13 +178,13 @@ begin
    wb_user_core_write('h3080_0000,'h1);
 
    #1;
-   //------------ SDRAM Config - 2
-   wb_user_core_write('h3000_0014,'h100_019E);
+   //------------ SDRAM Config - 2 -- moved to riscv-startup code
+   //wb_user_core_write('h3000_0014,'h100_019E);
    
    repeat (2) @(posedge clock);
    #1;
-   //------------ SDRAM Config - 1
-   wb_user_core_write('h3000_0010,'h2F17_2242);
+   //------------ SDRAM Config - 1 -- moved to riscv-startup code
+   //wb_user_core_write('h3000_0010,'h2F17_2242);
    
    repeat (2) @(posedge clock);
    #1;
@@ -193,7 +193,9 @@ begin
 
    repeat (16000) @(posedge clock);  // wait for Processor Get Ready
    tb_uart.uart_init;
-   wb_user_core_write(`ADDR_SPACE_UART+8'h0,{3'h0,2'b00,1'b1,1'b1,1'b1});  
+  
+   // Moved to Riscv code 
+   //wb_user_core_write(`ADDR_SPACE_UART+8'h0,{3'h0,2'b00,1'b1,1'b1,1'b1});  
    
    tb_uart.control_setup (uart_data_bit, uart_stop_bits, uart_parity_en, uart_even_odd_parity, 
 	                          uart_stick_parity, uart_timeout, uart_divisor);

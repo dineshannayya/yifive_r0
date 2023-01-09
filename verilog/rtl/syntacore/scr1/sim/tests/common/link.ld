@@ -1,3 +1,4 @@
+/*
 //////////////////////////////////////////////////////////////////////////////
 // SPDX-FileCopyrightText: Syntacore LLC © 2016-2021
 // 
@@ -15,6 +16,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Syntacore LLC
 // //////////////////////////////////////////////////////////////////////////
+**/
 /*
 * @file       <link.ld>
 * @brief      bare metal tests' linker script
@@ -24,7 +26,8 @@ OUTPUT_ARCH( "riscv" )
 ENTRY(_start)
 
 MEMORY {
-  RAM (rwx) : ORIGIN = 0x0, LENGTH = 64K
+  ROM (rxx) : ORIGIN = 0x0, LENGTH = 64K
+  RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 64K
 }
 
 STACK_SIZE = 1024;
@@ -45,7 +48,7 @@ SECTIONS {
     . = 0x100;
     PROVIDE(__TEXT_START__ = .);
     *(.text.init) 
-  } >RAM
+  } >ROM
 
   .text  : {
     *crt.o(.text .text.*)
@@ -53,7 +56,7 @@ SECTIONS {
     *(sc_test_section)
     . = ALIGN(CL_SIZE);
      PROVIDE(__TEXT_END__ = .);
-  } >RAM 
+  } >ROM
 
   /* data segment */
   .data : {

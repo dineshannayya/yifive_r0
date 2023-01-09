@@ -47,6 +47,15 @@
 
 int main()
 {
+    // SDRAM Config-2
+    //reg_mprj_globl_reg5  = 0x100019E; 
+
+    // configure the user uart
+    reg_mprj_uart_reg0  = 0x7;
+
+
+    // SDRAM Config-1
+    //reg_mprj_globl_reg4  = 0x2F172242;
 
     while(1) {
        // Check UART RX fifo has data, if available loop back the data

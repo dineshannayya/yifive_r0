@@ -1,0 +1,2 @@
+-v $(USER_PROJECT_VERILOG)/rtl/dg_pll/src/digital_pll_controller.v
+-v $(USER_PROJECT_VERILOG)/rtl/dg_pll/src/ring_osc2x13.v

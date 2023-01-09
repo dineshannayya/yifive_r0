@@ -24,6 +24,8 @@
 # define LREG lw
 # define SREG sw
 # define REGBYTES 4
+#define glbl_reg4  0x30000010 // SDRAM Config-1
+#define glbl_reg5  0x30000014 // SDRAM Config-2
 
     .globl _start
     .globl main
@@ -46,6 +48,15 @@ _start:
 #else
     zero_int_regs 1, 15
 #endif
+    // SDRAM Config-2
+    li    t0, glbl_reg5
+    li    t1, 0x100019E
+    sw    t1, (t0)
+
+    // SDRAM Config-1
+    li    t0, glbl_reg4
+    li    t1, 0x2F172242
+    sw    t1, (t0)
     # Global pointer init
     .option push
     .option norelax
