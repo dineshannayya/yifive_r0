@@ -127,7 +127,7 @@ module risc_boot_tb;
         initial
         begin
            $dumpfile("simx.vcd");
-           $dumpvars(1,risc_boot_tb);
+           $dumpvars(0,risc_boot_tb);
            $dumpvars(1,risc_boot_tb.u_spi_flash_256mb);
            //$dumpvars(2,risc_boot_tb.uut);
            $dumpvars(4,risc_boot_tb.uut.mprj);
