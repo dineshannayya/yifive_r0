@@ -132,9 +132,15 @@ module hkspi_tb;
     // Now drive the digital signals on the housekeeping SPI
 	reg [7:0] tbdata;
 
+    `ifdef WFDUMP
 	initial begin
 	    $dumpfile("hkspi.vcd");
 	    $dumpvars(0, hkspi_tb);
+    end 
+    `endif
+
+    initial
+    begin
 
 	    CSB <= 1'b1;
 	    SCK <= 1'b0;
