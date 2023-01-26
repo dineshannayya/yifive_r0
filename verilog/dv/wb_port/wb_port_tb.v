@@ -51,7 +51,7 @@ pullup(mprj_io[3]);
 		$dumpvars(1, wb_port_tb);
 		$dumpvars(2, wb_port_tb.uut);
 		//$dumpvars(1, wb_port_tb.uut.mprj);
-		$dumpvars(0, wb_port_tb.uut.mprj.u_wb_host);
+		$dumpvars(0, wb_port_tb.uut.mprj);
 	end
        `endif
 

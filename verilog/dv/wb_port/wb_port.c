@@ -19,8 +19,14 @@
 #include <defs.h>
 #include <stub.c>
 
+#define reg_wb_enable	  	(*(volatile uint32_t*) CSR_MPRJ_WB_IENA_OUT_ADDR)
+
 // User Project Slaves (0x3000_0000)
 #define reg_mprj_slave (*(volatile uint32_t*)0x30000000)
+#define reg_mprj_wbhost_reg1      (*(volatile uint32_t*)0x30800004)
+#define reg_mprj_wbhost_clk_ctrl1 (*(volatile uint32_t*)0x30800008)
+#define reg_mprj_wbhost_clk_ctrl2 (*(volatile uint32_t*)0x3080000C)
+
 
 #define reg_mprj_wbhost_reg0 (*(volatile uint32_t*)0x30800000)
 #define reg_mprj_globl_reg0  (*(volatile uint32_t*)0x30000000)
@@ -107,44 +113,15 @@ void main()
 
     // Remove Wishbone Reset
     // keep wbs clock div=1 and ratio = 3
-    reg_mprj_wbhost_reg0 = 0xE00;
-    reg_mprj_wbhost_reg0 = 0xE01;
 
-    if (reg_mprj_globl_reg1 != 0xA55AA55A) bFail = 1;
-    if (reg_mprj_globl_reg2 != 0xAABBCCDD) bFail = 1;
+     reg_mprj_wbhost_clk_ctrl1 = 0x084868c2;
+     if(reg_mprj_wbhost_clk_ctrl1 != 0x084868c2)
+        bFail = 1;
 
-    // Write software Write & Read Register
-    reg_mprj_globl_reg6  = 0x11223344; 
-    reg_mprj_globl_reg7  = 0x22334455; 
-    reg_mprj_globl_reg8  = 0x33445566; 
-    reg_mprj_globl_reg9  = 0x44556677; 
-    reg_mprj_globl_reg10 = 0x55667788; 
-    reg_mprj_globl_reg11 = 0x66778899; 
-    reg_mprj_globl_reg12 = 0x778899AA; 
-    reg_mprj_globl_reg13 = 0x8899AABB; 
-    reg_mprj_globl_reg14 = 0x99AABBCC; 
-    reg_mprj_globl_reg15 = 0xAABBCCDD; 
+    reg_mprj_wbhost_clk_ctrl2 = 0x00;
+    // Remove All Reset
+    reg_mprj_wbhost_reg0 = 0x1F;
 
-
-    if (reg_mprj_globl_reg6  != 0x11223344) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB610000;
-    if (reg_mprj_globl_reg7  != 0x22334455) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB620000;
-    if (reg_mprj_globl_reg8  != 0x33445566) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB630000;
-    if (reg_mprj_globl_reg9  != 0x44556677) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB640000;
-    if (reg_mprj_globl_reg10 != 0x55667788) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB650000;
-    if (reg_mprj_globl_reg11 != 0x66778899) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB660000;
-    if (reg_mprj_globl_reg12 != 0x778899AA) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB670000;
-    if (reg_mprj_globl_reg13 != 0x8899AABB) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB680000;
-    if (reg_mprj_globl_reg14 != 0x99AABBCC) bFail = 1;
-    if (bFail == 1) reg_mprj_datal = 0xAB690000;
-    if (reg_mprj_globl_reg15 != 0xAABBCCDD) bFail = 1;
 
     if(bFail == 0) {
         reg_mprj_datal = 0xAB6A0000;

@@ -25,28 +25,30 @@ DESIGNS?=../../..
 CONFIG = caravel_user_project
 TOOLS?=/opt/riscv32i/
 
-export USER_FIRMWARE_PATH = $(DESIGNS)/verilog/dv/common/firmware
 ########################################################
 #include $(MCW_ROOT)/verilog/dv/make/env.makefile
 ########################################################
-#######################################################################
-## Global Environment Variables for local repo  
-#######################################################################
-
-export PDK_PATH =      $(PDK_ROOT)/sky130A
-export VIP_PATH =      $(CORE_VERILOG_PATH)/dv/vip
-export FIRMWARE_PATH = $(CORE_VERILOG_PATH)/dv/firmware
 
 #######################################################################
 ## Caravel Verilog for Integration Tests
 #######################################################################
 
-export CARAVEL_VERILOG_PATH ?=  $(CARAVEL_ROOT)/verilog
+export CARAVEL_ROOT         =  /home/dinesha/workarea/efabless/MPW-2/caravel-mpw-2b
+export CARAVEL_VERILOG_PATH =  /home/dinesha/workarea/efabless/MPW-2/caravel-mpw-2b/verilog
 export CORE_VERILOG_PATH    ?=  $(CARAVEL_ROOT)/mgmt_core_wrapper/verilog
 export USER_PROJECT_VERILOG ?=  $(DESIGNS)/verilog
 
 export CARAVEL_PATH = $(CARAVEL_VERILOG_PATH)
 export VERILOG_PATH = $(CORE_VERILOG_PATH)
+
+#######################################################################
+## Global Environment Variables for local repo  
+#######################################################################
+
+export PDK_PATH =      $(PDK_ROOT)/sky130A
+export DV_PATH =      $(CORE_VERILOG_PATH)/dv/
+export VIP_PATH =      $(CORE_VERILOG_PATH)/dv/vip
+export FIRMWARE_PATH = $(CORE_VERILOG_PATH)/dv/firmware
 
 #######################################################################
 ## Compiler Information 
@@ -127,10 +129,10 @@ hex:  ${BLOCKS:=.hex}
 %.elf: %.c $(LINKER_SCRIPT) $(SOURCE_FILES)
 	${GCC_PREFIX}-gcc -g \
 	-I$(FIRMWARE_PATH) \
+	-I$(DV_PATH) \
 	-I$(VERILOG_PATH)/dv/generated \
 	-I$(VERILOG_PATH)/dv/ \
 	-I$(VERILOG_PATH)/common \
-	-I$(USER_FIRMWARE_PATH) \
 	  $(CPUFLAGS) \
 	-Wl,-Bstatic,-T,$(LINKER_SCRIPT),--strip-debug \
 	-ffreestanding -nostdlib -o $@ $(SOURCE_FILES) $<
