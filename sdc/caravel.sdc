@@ -146,7 +146,7 @@ set_case_analysis 0 [get_pins {mprj/u_skew_wi/sel[0]}]
 
 set_case_analysis 1 [get_pins {mprj/u_skew_riscv/sel[3]}]
 set_case_analysis 1 [get_pins {mprj/u_skew_riscv/sel[2]}]
-set_case_analysis 0 [get_pins {mprj/u_skew_riscv/sel[1]}]
+set_case_analysis 1 [get_pins {mprj/u_skew_riscv/sel[1]}]
 set_case_analysis 0 [get_pins {mprj/u_skew_riscv/sel[0]}]
 
 set_case_analysis 1 [get_pins {mprj/u_skew_uart/sel[3]}]

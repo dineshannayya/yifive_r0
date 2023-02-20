@@ -356,6 +356,10 @@ assign mprj_io[33] =      (user_flash_oen == 1'b0) ? user_flash_sdout[1]: 1'bz;
 assign mprj_io[34] =      (user_flash_oen == 1'b0) ? user_flash_sdout[2]: 1'bz;
 assign mprj_io[35] =      (user_flash_oen == 1'b0) ? user_flash_sdout[3]: 1'bz;
 
+//assign mprj_io[32] =      (user_flash_oen == 1'b0) ? 1'b0: 1'bz;
+//assign mprj_io[33] =      (user_flash_oen == 1'b0) ? 1'b0: 1'bz;
+//assign mprj_io[34] =      (user_flash_oen == 1'b0) ? 1'b0: 1'bz;
+//assign mprj_io[35] =      (user_flash_oen == 1'b0) ? 1'b0: 1'bz;
 
 
 

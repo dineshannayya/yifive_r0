@@ -23,7 +23,11 @@
 
 // User Project Slaves (0x3000_0000)
 
-#define reg_mprj_wbhost_reg0 (*(volatile uint32_t*)0x30800000)
+#define reg_mprj_wbhost_reg0      (*(volatile uint32_t*)0x30800000)
+#define reg_mprj_wbhost_reg1      (*(volatile uint32_t*)0x30800004)
+#define reg_mprj_wbhost_clk_ctrl1 (*(volatile uint32_t*)0x30800008)
+#define reg_mprj_wbhost_clk_ctrl2 (*(volatile uint32_t*)0x3080000C)
+
 
 #define reg_mprj_globl_reg0  (*(volatile uint32_t*)0x30000000)
 #define reg_mprj_globl_reg1  (*(volatile uint32_t*)0x30000004)
@@ -123,7 +127,7 @@ void main()
     reg_mprj_xfer = 1;
     while (reg_mprj_xfer == 1);
 
-    reg_la2_oenb = reg_la2_iena = 0xFFFFFFFF;    // [95:64]
+    //reg_la2_oenb = reg_la2_iena = 0xFFFFFFFF;    // [95:64]
 
     // Flag start of the test
 	reg_mprj_datal = 0xAB600000;
@@ -175,7 +179,12 @@ void main()
     reg_mprj_xfer = 1;
     while (reg_mprj_xfer == 1);
 
+    reg_mprj_wbhost_clk_ctrl1 = 0x084868c2;
+
+    reg_mprj_wbhost_clk_ctrl2 = 0x00;
+
     // Remove All Reset
-    reg_mprj_wbhost_reg0 = 0x1F;
+    reg_mprj_wbhost_reg0 = 0x000001F;
+
 
 }

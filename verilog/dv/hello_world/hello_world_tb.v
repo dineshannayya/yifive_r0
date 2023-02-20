@@ -155,7 +155,7 @@ module hello_world_tb;
 	   $display("Monitor: Test User Risc Boot Started");
        
 	   // Wait for user risc core to boot up 
-           repeat (32000) @(posedge clock);  
+           repeat (30000) @(posedge clock);  
            tb_uart.uart_init;
            tb_uart.control_setup (uart_data_bit, uart_stop_bits, uart_parity_en, uart_even_odd_parity, 
         	                          uart_stick_parity, uart_timeout, uart_divisor);
