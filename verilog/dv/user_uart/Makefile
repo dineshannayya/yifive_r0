@@ -42,7 +42,6 @@ GCC64_PREFIX?=riscv64-unknown-elf
 ## RISCV GCC 
 GCC_PATH?=/ef/apps/bin
 GCC_PREFIX?=riscv32-unknown-elf
-PDK_PATH?=/ef/tech/SW/sky130A
 
 ## Simulation mode: RTL/GL
 SIM?=RTL
@@ -67,7 +66,7 @@ vvp:  ${PATTERN:=.vvp}
 	rm crt_tcm.o user_uart.o
 ifeq ($(SIM),RTL)
    ifeq ($(DUMP),OFF)
-	iverilog -g2005-sv -DFUNCTIONAL -DSIM -I $(PDK_PATH) \
+	iverilog -g2005-sv -DFUNCTIONAL -DSIM  \
 	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) \
 	-I $(UPRJ_BEHAVIOURAL_MODELS)    -I $(UPRJ_RTL_PATH) -I $(UPRJ_VERILOG_PATH) \
 	-I $(UPRJ_BEHAVIOURAL_AGENTS)    \
@@ -75,7 +74,7 @@ ifeq ($(SIM),RTL)
 	-I $(UPRJ_INCLUDE_PATH4) -I $(UPRJ_INCLUDE_PATH5) \
 	$< -o $@ 
     else  
-	iverilog -g2005-sv -DWFDUMP -DFUNCTIONAL -DSIM -I $(PDK_PATH) \
+	iverilog -g2005-sv -DWFDUMP -DFUNCTIONAL -DSIM \
 	-I $(CARAVEL_BEHAVIOURAL_MODELS) -I $(CARAVEL_RTL_PATH) \
 	-I $(UPRJ_BEHAVIOURAL_MODELS)    -I $(UPRJ_RTL_PATH) -I $(UPRJ_VERILOG_PATH) \
 	-I $(UPRJ_BEHAVIOURAL_AGENTS)    \

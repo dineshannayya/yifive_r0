@@ -357,6 +357,13 @@ wire [3:0]                        cfg_cska_sdram; // clock skew adjust for sdram
 wire [3:0]                        cfg_cska_glbl ; // clock skew adjust for global reg
 wire [3:0]                        cfg_cska_wh   ; // clock skew adjust for web host
 wire [3:0]                        cfg_cska_mbist; // clock skew adjust for MBIST
+wire                              wbd_clk_wi    ; // clock for wishbone interconnect
+wire                              wbd_clk_riscv ; // clock for riscv
+wire                              wbd_clk_uart  ; // clock for uart
+wire                              wbd_clk_spi   ; // clock for spi
+wire                              wbd_clk_sdram ; // clock for sdram
+wire                              wbd_clk_glbl  ; // clock for global reg
+wire                              wbd_clk_wh    ; // clock for global reg
 
 wire [3:0]                        cfg_cska_sd_co; // clock skew adjust for sdram clock out
 wire [3:0]                        cfg_cska_sd_ci; // clock skew adjust for sdram clock input

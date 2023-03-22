@@ -79,7 +79,7 @@ module clk_buf (
 
                
 
-sky130_fd_sc_hd__clkbuf_16 u_buf  (.A(clk_i),.X(clk_o));
+ctech_clk_buf u_buf  (.A(clk_i),.X(clk_o));
 
 endmodule 
 

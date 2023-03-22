@@ -14,6 +14,10 @@
 // limitations under the License.
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileContributor: Modified by Dinesh Annayya <dinesha@opencores.org>
+//
+
+`timescale  1ns/1ps
+
 module uart_agent (
 	mclk,
 	txd,
@@ -37,6 +41,7 @@ reg [15:0] stop_err1_cnt;
 reg [15:0] stop_err2_cnt;
 reg [15:0] timeout_err_cnt;
 reg [15:0] err_cnt;
+reg        uart_rxenb; // uart rx enable
 
 reg 	   txd, read, write;
 wire	   uart_rx_clk;
@@ -46,11 +51,14 @@ reg	   stop_err_check;
 integer timeout_count;
 integer data_bit_number;
 reg [15:0] clk_count;
+reg        debug_mode;
 
 reg      error_ind; // 1 indicate error
 
 initial 
 begin
+    uart_rxenb = 0;
+	debug_mode = 1; // Keep in debug mode and enable display
 	txd = 1'b1;
  	uart_clk = 0;
 	clk_count = 0;
@@ -61,19 +69,26 @@ end
 always @(posedge mclk)
 begin
    if (clk_count == 'h0) begin
-      uart_clk = ~uart_clk;
+      uart_clk  = ~uart_clk;
       clk_count = control_setup.divisor;	
    end else begin
       clk_count = clk_count - 1;	
    end
 end
-assign uart_rx_clk = ~uart_clk;
+assign uart_rx_clk = uart_clk;
 
 always @(posedge mclk)
 begin
-	timeout_count = timeout_count + 1;
-	if (timeout_count == (control_setup.maxtime * 16))
-		-> abort;
+    if(uart_rxenb) begin
+      	timeout_count = timeout_count + 1;
+      	if (timeout_count >= (control_setup.maxtime * 16)) begin
+            timeout_count = 0;
+            uart_rxenb    = 0;
+      	    -> abort;
+        end
+    end else begin
+      	timeout_count = 0;
+    end
 end
 
 always @uart_read_done
@@ -112,6 +127,7 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 task uart_init;
 begin
+  uart_rxenb = 0;
   read = 0;
   write = 0;
   tx_count = 0;
@@ -122,6 +138,7 @@ begin
   stop_err2_cnt = 0;
   timeout_err_cnt = 0;
   err_cnt = 0;
+  clk_count = 0;
 
 end 
 endtask 
@@ -129,21 +146,22 @@ endtask
 
 ////////////////////////////////////////////////////////////////////////////////
 task read_char_chk;
-input 	expected_data;
+input [7:0]	expected_data;
 
 integer i;
-reg	[7:0] expected_data;
 reg 	[7:0] data;
 reg	parity;
 
 begin
-	data <= 8'h0;
-	parity <= 1;
+	data = 8'h0;
+	parity = 1;
 	timeout_count = 0;
+    uart_rxenb = 1;
 
 fork	
    begin : loop_1
         @(abort)
+	if(debug_mode)
          $display ("%m: >>>>> Exceed time limit, uart no responce.\n");
          ->uart_timeout_error;
          disable loop_2;
@@ -154,15 +172,208 @@ fork
 // start cycle
 	@(negedge rxd) 
 	 disable loop_1;
-	 read <= 1;
+	 read = 1;
 
 // data cycle
 	@(posedge uart_rx_clk);
 	 for (i = 0; i < data_bit_number; i = i + 1)
 	  begin
 	    @(posedge uart_rx_clk)
-	    data[i] <=  rxd;
-	    parity <= parity ^ rxd;
+	    data[i] =  rxd;
+	    parity = parity ^ rxd;
+	  end		
+
+// parity cycle
+	if(control_setup.parity_en)
+	begin
+          @(posedge uart_rx_clk);
+	  if ((control_setup.even_odd_parity && (rxd == parity)) ||
+	     (!control_setup.even_odd_parity && (rxd != parity)))
+	     begin
+		   $display ("%m: >>>>>  Parity Error");	
+ 		-> error_detected;
+		-> uart_parity_error;
+	     end
+	end
+
+// stop cycle 1
+        @(posedge uart_rx_clk);	
+	  if (!rxd)
+	     begin
+		$display ("%m: >>>>>  Stop signal 1 Error");	
+ 		-> error_detected;
+		-> uart_stop_error1;
+	     end
+
+// stop cycle 2
+	if (control_setup.stop_bit_number)
+	begin
+	      @(posedge uart_rx_clk);	// stop cycle 2
+		if (!rxd)
+		  begin
+		    $display ("%m: >>>>>  Stop signal 2 Error");	
+ 		    -> error_detected;
+		    -> uart_stop_error2;
+		  end
+	end
+
+	read = 0;
+	-> uart_read_done;
+
+	if (expected_data != data)
+	begin
+		$display ("%m: Error! Data return is %h, expecting %h", data, expected_data);
+		-> error_detected;
+	end
+	else begin
+	        if(debug_mode)
+		  $display ("%m: Data match  %h", expected_data);
+	end
+
+	if(debug_mode)
+	   $display ("%m:... Read Data from UART done cnt :%d...",rx_count +1);
+   end
+join
+    uart_rxenb = 0;
+
+end
+
+endtask
+
+////////////////////////////////////////////////////////////////////////////////
+task read_char2;
+output [7:0]	rxd_data;
+output          timeout; // 1-> timeout
+integer j;
+reg	[7:0] rxd_data;
+reg 	[7:0] data;
+reg	parity;
+
+begin
+	data = 8'h0;
+	parity = 1;
+	timeout_count = 0;
+	timeout = 0;
+    uart_rxenb = 1;
+
+   fork	
+   begin 
+        @(abort)
+         //$display (">>>>>  Exceed time limit, uart no responce.\n");
+         //->uart_timeout_error;
+	  timeout = 1;
+   end
+
+   begin
+
+// start cycle
+	@(negedge rxd) 
+	 read = 1;
+
+// data cycle
+	@(posedge uart_rx_clk );
+	 for (j = 0; j < data_bit_number; j = j + 1)
+	  begin
+	    @(posedge uart_rx_clk)
+	    data[j] =  rxd;
+	    parity = parity ^ rxd;
+	  end		
+
+// parity cycle
+	if(control_setup.parity_en)
+	begin
+          @(posedge uart_rx_clk);
+	  if ((control_setup.even_odd_parity && (rxd == parity)) ||
+	     (!control_setup.even_odd_parity && (rxd != parity)))
+	     begin
+		$display (">>>>>  Parity Error");	
+ 		-> error_detected;
+		-> uart_parity_error;
+	     end
+	end
+
+// stop cycle 1
+        @(posedge uart_rx_clk);	
+	  if (!rxd)
+	     begin
+		$display (">>>>>  Stop signal 1 Error");	
+ 		-> error_detected;
+		-> uart_stop_error1;
+	     end
+
+// stop cycle 2
+	if (control_setup.stop_bit_number)
+	begin
+	      @(posedge uart_rx_clk);	// stop cycle 2
+		if (!rxd)
+		  begin
+		    $display (">>>>>  Stop signal 2 Error");	
+ 		    -> error_detected;
+		    -> uart_stop_error2;
+		  end
+	end
+
+	read = 0;
+	-> uart_read_done;
+
+//      $display ("(%m) Received Data  %c", data);
+//	$display ("... Read Data from UART done cnt :%d...",rx_count +1);
+        $write ("%c",data);
+	rxd_data = data;
+   end
+   join_any
+   disable fork; //disable pending fork activity
+
+    uart_rxenb = 0;
+end
+
+endtask
+
+
+////////////////////////////////////////////////////////////////////////////////
+task read_char;
+output [7:0]	rxd_data;
+output          timeout; // 1-> timeout
+
+reg	[7:0] rxd_data;
+
+
+integer i;
+reg 	[7:0] data;
+reg	parity;
+
+begin
+	data = 8'h0;
+	parity = 1;
+	timeout_count = 0;
+	timeout = 0;
+    uart_rxenb = 1;
+
+
+fork	
+   begin : loop_1
+        @(abort)
+	 if(debug_mode)
+             $display ("%m: >>>>> Exceed time limit, uart no responce.\n");
+	 timeout = 1;
+         ->uart_timeout_error;
+         disable loop_2;
+   end
+
+   begin : loop_2
+
+// start cycle
+	@(negedge rxd) 
+	 disable loop_1;
+	 read = 1;
+
+// data cycle
+	@(posedge uart_rx_clk);
+	 for (i = 0; i < data_bit_number; i = i + 1)
+	  begin
+	    @(posedge uart_rx_clk)
+	    data[i] =  rxd;
+	    parity = parity ^ rxd;
 	  end		
 
 // parity cycle
@@ -199,28 +410,100 @@ fork
 		  end
 	end
 
-
-// wait another half cycle for tx_done signal
-		@(negedge uart_rx_clk);
-	read <= 0;
+	read = 0;
 	-> uart_read_done;
 
-	if (expected_data != data)
-	begin
-		$display ("%m: Error! Data return is %h, expecting %h", data, expected_data);
-		-> error_detected;
-	end
-	else
-		$display ("%m: Data match  %h", expected_data);
+	rxd_data = data;
 
-	$display ("%m:... Read Data from UART done cnt :%d...",rx_count +1);
+
+	if(debug_mode) begin
+	   $display ("%m: Received Data %h", rxd_data);
+	   $display ("%m:... Read Data from UART done cnt :%d...",rx_count +1);
+        end
    end
 join
+    uart_rxenb = 0;
 
 end
 
 endtask
 
+
+// Read Task without Timeout
+task read_char3;
+output [7:0]	rxd_data;
+reg	[7:0] rxd_data;
+integer i;
+reg 	[7:0] data;
+reg	parity;
+
+begin
+	data = 8'h0;
+	parity = 1;
+    uart_rxenb = 1;
+
+
+fork	
+   begin : loop_2
+
+// start cycle
+	@(negedge rxd) 
+	 read = 1;
+
+// data cycle
+	@(posedge uart_rx_clk);
+	 for (i = 0; i < data_bit_number; i = i + 1)
+	  begin
+	    @(posedge uart_rx_clk)
+	    data[i] =  rxd;
+	    parity = parity ^ rxd;
+	  end		
+
+// parity cycle
+	if(control_setup.parity_en)
+	begin
+          @(posedge uart_rx_clk);
+	  if ((control_setup.even_odd_parity && (rxd == parity)) ||
+	     (!control_setup.even_odd_parity && (rxd != parity)))
+	     begin
+		$display ("%m: >>>>>  Parity Error");	
+ 		-> error_detected;
+		-> uart_parity_error;
+	     end
+	end
+
+// stop cycle 1
+        @(posedge uart_rx_clk);	
+	  if (!rxd)
+	     begin
+		$display ("%m: >>>>>  Stop signal 1 Error");	
+ 		-> error_detected;
+		-> uart_stop_error1;
+	     end
+
+// stop cycle 2
+	if (control_setup.stop_bit_number)
+	begin
+	      @(posedge uart_rx_clk);	// stop cycle 2
+		if (!rxd)
+		  begin
+		    $display ("%m: >>>>>  Stop signal 2 Error");	
+ 		    -> error_detected;
+		    -> uart_stop_error2;
+		  end
+	end
+
+	read = 0;
+	-> uart_read_done;
+
+	rxd_data = data;
+   end
+join
+    uart_rxenb = 0;
+
+end
+
+endtask
 
 ////////////////////////////////////////////////////////////////////////////////
 task write_char;
@@ -230,13 +513,13 @@ integer i;
 reg parity;	// 0: odd parity, 1: even parity
 
 begin
-	parity <=  #1 1;
+	parity =  #1 1;
 
 // start cycle
 	@(posedge uart_clk)
 	 begin
-		txd <= #1 0;
-		write <= #1 1;
+		txd = #1 0;
+		write = #1 1;
 	 end
 
 // data cycle
@@ -244,8 +527,8 @@ begin
 	   for (i = 0; i < data_bit_number; i = i + 1)
 	   begin
 		@(posedge uart_clk)
-		    txd <= #1 data[i];
-		parity <= parity ^ data[i];
+		    txd = #1 data[i];
+		parity = parity ^ data[i];
 	   end
 	end
 
@@ -253,25 +536,28 @@ begin
 	if (control_setup.parity_en)
 	begin
 		@(posedge uart_clk)
-			txd <= #1 
+			txd = #1 
 //				control_setup.stick_parity ? ~control_setup.even_odd_parity : 
 				control_setup.even_odd_parity ? !parity : parity;
 	end
 
 // stop cycle 1
 	@(posedge uart_clk)
-		txd <= #1 stop_err_check ? 0 : 1;
+		txd = #1 stop_err_check ? 0 : 1;
 
 // stop cycle 2
 	@(posedge uart_clk);
-		txd <= #1 1;
+		txd = #1 1;
 	if (data_bit_number == 5)
 		@(negedge uart_clk);
 	else if (control_setup.stop_bit_number)
 		@(posedge uart_clk);
 
-	write <= #1 0;
-	$display ("%m:... Write data %h to UART done cnt : %d ...\n", data,tx_count+1);
+	write = #1 0;
+	if(debug_mode)
+	   $display ("%m:... Write data %h to UART done cnt : %d ...\n", data,tx_count+1);
+        else
+	   $write ("%c",data);
 	-> uart_write_done;
 end
 endtask

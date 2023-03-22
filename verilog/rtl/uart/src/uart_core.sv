@@ -195,6 +195,7 @@ wire line_clk_16x_in;
 // OpenSource CTS tool does not work with buffer as source point
 // changed buf to max with select tied=0
 //ctech_clk_buf u_lineclk_buf  (.A(line_clk_16x_in),  .X(line_clk_16x));
+wire line_clk_16x;
 ctech_mux2x1 u_lineclk_buf  (.A0(line_clk_16x_in), .A1(1'b0), .S(1'b0), .X(line_clk_16x));
 
 clk_ctl #(11) u_clk_ctl (
@@ -222,9 +223,9 @@ reset_sync  u_app_rst (
 //###################################
 reset_sync  u_line_rst (
 	      .scan_mode  (1'b0           ),
-              .dclk       (line_clk_16x   ), // Destination clock domain
+          .dclk       (line_clk_16x   ), // Destination clock domain
 	      .arst_n     (arst_n         ), // active low async reset
-              .srst_n     (line_reset_n   )
+          .srst_n     (line_reset_n   )
           );
 
 
